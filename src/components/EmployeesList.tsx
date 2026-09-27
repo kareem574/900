@@ -23,6 +23,9 @@ import { Employee } from '../types';
 
 interface EmployeesListProps {
   employees: Employee[];
+  targetDate: string;
+  availableDates: string[];
+  onSelectTargetDate: (d: string) => void;
   onSendSmsSingle: (employee: Employee) => Promise<void>;
   onSendToAllUnbooked: (targetList?: Employee[]) => void;
   onUpdateEmployee: (updated: Employee) => void;
@@ -32,28 +35,19 @@ interface EmployeesListProps {
 
 export const EmployeesList: React.FC<EmployeesListProps> = ({
   employees,
+  targetDate,
+  availableDates,
+  onSelectTargetDate,
   onSendSmsSingle,
   onSendToAllUnbooked,
   onUpdateEmployee,
   onAddEmployee,
   sendingId,
 }) => {
-  const [filter, setFilter] = useState<'all' | 'zero_days' | 'unbooked' | 'booked' | 'partial'>('unbooked');
-  const [selectedDateFilter, setSelectedDateFilter] = useState<string>('all');
+  const [filter, setFilter] = useState<'all' | 'unbooked' | 'booked'>('unbooked');
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
-
-  // Extract all unique dates from employees' dayStatuses
-  const availableDates: string[] = React.useMemo(() => {
-    const datesSet = new Set<string>();
-    employees.forEach((e) => {
-      if (e.dayStatuses) {
-        Object.keys(e.dayStatuses).forEach((d) => datesSet.add(d));
-      }
-    });
-    return Array.from(datesSet);
-  }, [employees]);
 
   // Filter employees
   const filtered = employees.filter((emp) => {
@@ -68,30 +62,15 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
 
     if (!matchesSearch) return false;
 
-    // Date specific filter
-    if (selectedDateFilter !== 'all' && emp.dayStatuses) {
-      const statusForDay = emp.dayStatuses[selectedDateFilter];
-      if (filter === 'unbooked' || filter === 'zero_days') {
-        if (statusForDay !== 'غير مختار') return false;
-      } else if (filter === 'booked') {
-        if (statusForDay !== 'مختار') return false;
-      }
-      return true;
-    }
-
-    // Main status filter
+    // Filter by target date status
     if (filter === 'all') return true;
-    if (filter === 'zero_days') return (emp.selectedDaysCount ?? 0) === 0;
     if (filter === 'unbooked') return emp.shiftStatus === 'unbooked';
-    if (filter === 'partial') return (emp.selectedDaysCount ?? 0) > 0 && (emp.selectedDaysCount ?? 0) < 6;
     if (filter === 'booked') return emp.shiftStatus === 'booked';
 
     return true;
   });
 
-  const zeroDaysCount = employees.filter((e) => (e.selectedDaysCount ?? 0) === 0).length;
   const unbookedCount = employees.filter((e) => e.shiftStatus === 'unbooked').length;
-  const partialCount = employees.filter((e) => (e.selectedDaysCount ?? 0) > 0 && (e.selectedDaysCount ?? 0) < 6).length;
   const bookedCount = employees.filter((e) => e.shiftStatus === 'booked').length;
 
   return (
@@ -100,7 +79,7 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
       {/* Top Filter and Controls Bar */}
       <div className="flex flex-col gap-4">
         
-        {/* Row 1: Search & Date Filter */}
+        {/* Row 1: Search & Target Date Picker */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           
           {/* Search Input */}
@@ -117,18 +96,17 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
 
           {/* Date Selector Filter */}
           {availableDates.length > 0 && (
-            <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5">
+            <div className="flex items-center gap-2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5">
               <Calendar className="w-4 h-4 text-blue-400 shrink-0" />
-              <span className="text-xs text-slate-400 whitespace-nowrap">اليوم المستهدف:</span>
+              <span className="text-xs text-slate-400 whitespace-nowrap">تاريخ السحب:</span>
               <select
-                value={selectedDateFilter}
-                onChange={(e) => setSelectedDateFilter(e.target.value)}
-                className="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer"
+                value={targetDate}
+                onChange={(e) => onSelectTargetDate(e.target.value)}
+                className="bg-transparent text-xs font-bold text-blue-300 focus:outline-none cursor-pointer"
               >
-                <option value="all" className="bg-slate-900">جميع الأيام</option>
-                {availableDates.map((d) => (
-                  <option key={d} value={d} className="bg-slate-900">
-                    {d}
+                {availableDates.map((d, idx) => (
+                  <option key={d} value={d} className="bg-slate-900 text-white">
+                    {d} {idx === 0 ? '(أول تاريخ متاح بالشيت)' : ''}
                   </option>
                 ))}
               </select>
@@ -143,7 +121,7 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 via-rose-500 to-red-600 hover:from-rose-500 hover:to-red-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all cursor-pointer whitespace-nowrap"
               >
                 <Send className="w-4 h-4" />
-                <span>إرسال SMS لغير المختارين ({filtered.filter((e) => e.shiftStatus === 'unbooked').length})</span>
+                <span>إرسال SMS لغير المختارين ليوم {targetDate} ({filtered.filter((e) => e.shiftStatus === 'unbooked').length})</span>
               </button>
             )}
           </div>
@@ -153,65 +131,37 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
         <div className="flex items-center gap-2 p-1.5 bg-slate-950/80 border border-slate-800 rounded-2xl overflow-x-auto text-xs font-semibold">
           <button
             onClick={() => setFilter('unbooked')}
-            className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               filter === 'unbooked'
                 ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
                 : 'text-rose-400 hover:bg-rose-500/10'
             }`}
           >
             <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
-            <span>غير مختار (مطلوب تذكير)</span>
-            <span className="px-1.5 py-0.2 rounded-md bg-rose-950 text-rose-200 text-[11px] font-mono">
-              {unbookedCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setFilter('zero_days')}
-            className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-              filter === 'zero_days'
-                ? 'bg-red-700 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-            }`}
-          >
-            <span>غير مختار نهائياً (0 أيام)</span>
-            <span className="px-1.5 py-0.2 rounded-md bg-slate-800 text-slate-300 text-[11px] font-mono">
-              {zeroDaysCount}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setFilter('partial')}
-            className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-              filter === 'partial'
-                ? 'bg-amber-600 text-white shadow-md'
-                : 'text-amber-400 hover:bg-amber-500/10'
-            }`}
-          >
-            <span>حجز جزئي (متبقي أيام)</span>
-            <span className="px-1.5 py-0.2 rounded-md bg-amber-950 text-amber-200 text-[11px] font-mono">
-              {partialCount}
+            <span>غير مختار في تاريخ {targetDate}</span>
+            <span className="px-2 py-0.5 rounded-md bg-rose-950 text-rose-200 text-xs font-mono font-bold">
+              {unbookedCount} موظف
             </span>
           </button>
 
           <button
             onClick={() => setFilter('booked')}
-            className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+            className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               filter === 'booked'
                 ? 'bg-emerald-600 text-white shadow-md'
                 : 'text-emerald-400 hover:bg-emerald-500/10'
             }`}
           >
             <Check className="w-3.5 h-3.5" />
-            <span>مختار بالكامل (مؤكد)</span>
-            <span className="px-1.5 py-0.2 rounded-md bg-emerald-950 text-emerald-200 text-[11px] font-mono">
-              {bookedCount}
+            <span>مختار في تاريخ {targetDate}</span>
+            <span className="px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-200 text-xs font-mono font-bold">
+              {bookedCount} موظف
             </span>
           </button>
 
           <button
             onClick={() => setFilter('all')}
-            className={`px-3.5 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+            className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
               filter === 'all'
                 ? 'bg-blue-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
@@ -229,10 +179,12 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
           <thead className="bg-slate-950/80 text-slate-400 text-xs uppercase font-bold border-b border-slate-800">
             <tr>
               <th className="py-3.5 px-4">الموظف والكود</th>
-              <th className="py-3.5 px-4">رقم الهاتف</th>
+              <th className="py-3.5 px-4">رقم الهاتف (SMS)</th>
               <th className="py-3.5 px-4">المنطقة والمشرف</th>
-              <th className="py-3.5 px-4">حالة الحجز الكلية</th>
-              <th className="py-3.5 px-4">تفاصيل حجز الأيام (مختار / غير مختار)</th>
+              <th className="py-3.5 px-4">
+                الحالة في أول تاريخ ({targetDate})
+              </th>
+              <th className="py-3.5 px-4">جدول كافة الأيام بالشيت</th>
               <th className="py-3.5 px-4 text-center">إجراءات SMS</th>
             </tr>
           </thead>
@@ -259,7 +211,7 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
                   <tr
                     key={emp.id}
                     className={`hover:bg-slate-800/40 transition-colors ${
-                      isUnbooked ? 'bg-rose-950/15' : ''
+                      isUnbooked ? 'bg-rose-950/15' : 'bg-emerald-950/5'
                     }`}
                   >
                     {/* Name & ID */}
@@ -292,7 +244,7 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
                     {/* Phone */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-slate-200 dir-ltr text-right">
+                        <span className="font-mono text-xs font-semibold text-slate-200 dir-ltr text-right">
                           {emp.phone || emp.rawPhone || 'بدون رقم'}
                         </span>
                         {emp.phone && (
@@ -324,28 +276,26 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
                       </div>
                     </td>
 
-                    {/* Status Badge */}
+                    {/* Target Date Status Badge */}
                     <td className="py-3.5 px-4">
                       {isUnbooked ? (
                         <div className="space-y-1">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black bg-rose-500/20 text-rose-300 border border-rose-500/40">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"></span>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm shadow-rose-950">
+                            <span className="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></span>
                             غير مختار
                           </span>
-                          <p className="text-[11px] text-rose-400 font-semibold">
-                            {emp.selectedDaysCount === 0
-                              ? 'لم يختر أي يوم (0 / 6)'
-                              : `مختار جزئياً (${emp.selectedDaysCount} / 6)`}
+                          <p className="text-[11px] text-rose-400 font-medium">
+                            مستهدف لإرسال SMS
                           </p>
                         </div>
                       ) : (
                         <div className="space-y-1">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                             <Check className="w-3.5 h-3.5 text-emerald-400" />
                             مختار (حجز مؤكد)
                           </span>
                           <p className="text-[11px] text-emerald-400 font-medium">
-                            {emp.selectedDaysCount || 6} من 6 أيام
+                            تم الحجز لهذا التاريخ
                           </p>
                         </div>
                       )}
@@ -357,17 +307,24 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
                         <div className="flex flex-wrap gap-1.5 max-w-xs">
                           {Object.entries(emp.dayStatuses).map(([day, st]) => {
                             const isChosen = st === 'مختار';
+                            const isTarget = day === targetDate;
                             return (
                               <div
                                 key={day}
-                                title={`${day}: ${st}`}
+                                title={`${day}: ${st} ${isTarget ? '(التاريخ المستهدف للإرسال)' : ''}`}
                                 className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold border ${
-                                  isChosen
-                                    ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-                                    : 'bg-rose-500/20 border-rose-500/40 text-rose-300'
+                                  isTarget
+                                    ? isChosen
+                                      ? 'bg-emerald-500/30 border-emerald-400 text-emerald-200 ring-1 ring-emerald-400'
+                                      : 'bg-rose-500/30 border-rose-400 text-rose-200 ring-1 ring-rose-400'
+                                    : isChosen
+                                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                    : 'bg-slate-800/80 border-slate-700 text-slate-400'
                                 }`}
                               >
-                                <span>{day.split('/').slice(-2).join('/')}</span>
+                                <span className={isTarget ? 'underline font-bold' : ''}>
+                                  {day.split('/').slice(-2).join('/')}
+                                </span>
                                 <span>{isChosen ? 'مختار' : 'غير مختار'}</span>
                               </div>
                             );

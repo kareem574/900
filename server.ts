@@ -101,6 +101,10 @@ async function startServer() {
         }
       });
 
+      // Extract first date available
+      const firstDate = dateColumns.length > 0 ? dateColumns[0].col : '';
+      const requestedDate = (req.query.targetDate as string) || firstDate;
+
       const employees = rows.map((row, rIdx) => {
         const id = idIdx >= 0 && row[idIdx] ? row[idIdx] : `emp-${rIdx + 1}`;
         const name = nameIdx >= 0 && row[nameIdx] ? row[nameIdx] : `موظف #${rIdx + 1}`;
@@ -133,12 +137,13 @@ async function startServer() {
         const selectedDays = !isNaN(rawSelectedCount) ? rawSelectedCount : bookedDaysCount;
         const totalDays = dateColumns.length > 0 ? dateColumns.length : 6;
 
-        // Overall shiftStatus:
-        // If selectedDays === 0 or unbookedDaysCount === totalDays -> strictly 'unbooked' (لم يحجز إطلاقاً)
-        // If selectedDays < totalDays -> 'unbooked' (غير مختار بالكامل، متبقي أيام لم تحجز)
-        // If selectedDays >= totalDays -> 'booked' (مختار بالكامل)
+        // Target Date status (first date in sheet by default)
+        const targetDateStatus: 'مختار' | 'غير مختار' =
+          requestedDate && dayStatuses[requestedDate] === 'مختار' ? 'مختار' : 'غير مختار';
+
+        // Base shiftStatus on the target date (first date available) as requested by user
         const shiftStatus: 'unbooked' | 'booked' | 'excused' =
-          selectedDays >= totalDays ? 'booked' : 'unbooked';
+          targetDateStatus === 'مختار' ? 'booked' : 'unbooked';
 
         const unbookedDaysList = Object.entries(dayStatuses)
           .filter(([_, status]) => status === 'غير مختار')
@@ -154,20 +159,20 @@ async function startServer() {
           area,
           zone,
           shiftStatus,
+          targetDate: requestedDate,
+          targetDateStatus,
           selectedDaysCount: selectedDays,
           totalShiftDays: totalDays,
           unbookedDaysCount,
           unbookedDaysList,
           dayStatuses,
-          shiftDate: unbookedDaysList.length > 0 ? unbookedDaysList.join(', ') : 'جميع الأيام محجوزة',
+          shiftDate: requestedDate || (unbookedDaysList.length > 0 ? unbookedDaysList[0] : '2026/09/28'),
           shiftTime: 'وردية العمل المعتمدة',
           smsCount: 0,
           notes:
-            selectedDays === 0
-              ? 'غير مختار (0 من 6 أيام)'
-              : selectedDays < totalDays
-              ? `غير مختار جزئياً (${selectedDays} من ${totalDays} أيام مختارة)`
-              : 'مختار بالكامل (تم الحجز)',
+            targetDateStatus === 'غير مختار'
+              ? `غير مختار في تاريخ ${requestedDate}`
+              : `مختار في تاريخ ${requestedDate}`,
         };
       });
 
@@ -175,6 +180,8 @@ async function startServer() {
         success: true,
         headers,
         rawRows: rows,
+        firstDate,
+        targetDate: requestedDate,
         dateColumns: dateColumns.map((d) => d.col),
         totalStaff: employees.length,
         unbookedCount: employees.filter((e) => e.shiftStatus === 'unbooked').length,

@@ -28,6 +28,7 @@ interface HeaderProps {
   onRefreshSheet: () => void;
   isRefreshing: boolean;
   sheetSource: string;
+  onOpenHelpModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -43,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
   onRefreshSheet,
   isRefreshing,
   sheetSource,
+  onOpenHelpModal,
 }) => {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -168,6 +170,17 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </span>
             </div>
+
+            {/* Real Delivery Help Button */}
+            {onOpenHelpModal && (
+              <button
+                onClick={onOpenHelpModal}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer shadow-sm"
+                title="اضغط هنا إذا كانت الرسائل لا تصل لهاتفك"
+              >
+                <span>❓ حل عدم وصول الرسائل</span>
+              </button>
+            )}
 
             {/* Sync / Refresh Button */}
             <button

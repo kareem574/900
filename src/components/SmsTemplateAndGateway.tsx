@@ -319,97 +319,158 @@ export const SmsTemplateAndGateway: React.FC<SmsTemplateAndGatewayProps> = ({
 
       {activeTab === 'gateway' && (
         <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-6 space-y-6">
+          
+          {/* Explanation Alert for Real Delivery */}
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                <HelpCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-amber-300">
+                  هل لم تصلك الرسائل على هاتفك بعد؟
+                </h4>
+                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  إذا كنت تستخدم <strong>«المحاكي المدمج»</strong>، فالإرسال يتم افتراضياً على شاشة النظام فقط للتجربة بدون استهلاك رصيد. لإيصال التذكيرات فعلياً لهواتف الموظفين، اختر <strong>«واتساب المباشر»</strong> (مجاني وفوري) أو <strong>«تطبيق رسائل الموبايل»</strong> أو <strong>«بوابة SMS»</strong> أدناه:
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => onUpdateGateway({ ...gatewayConfig, gatewayType: 'whatsapp' })}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold whitespace-nowrap shadow-md cursor-pointer shrink-0"
+            >
+              تفعيل واتساب الفوري الآن
+            </button>
+          </div>
+
           <div>
-            <h3 className="text-base font-bold text-white">اختيار وتوصيل بوابة الرسائل القصيرة (SMS Gateway)</h3>
+            <h3 className="text-base font-bold text-white">اختيار وتوصيل بوابة الرسائل (SMS Gateway)</h3>
             <p className="text-xs text-slate-400 mt-1">
-              اختر طريقة الإرسال المناسبة لمنشأتك (سواء عبر المحاكي المدمج للاختبار، أو حساب Twilio، أو بوابة اتصالات محلية)
+              اختر طريقة الإرسال المناسبة لمنشأتك (واتساب مجاني فوري، تطبيق رسائل الموبايل، أو بوابات الرسائل المجمعة)
             </p>
           </div>
 
           {/* Gateway Option Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             
-            {/* 1. Simulator */}
+            {/* 1. WhatsApp Direct (Free & Instant Real Delivery) */}
             <div
-              onClick={() => onUpdateGateway({ ...gatewayConfig, gatewayType: 'simulator' })}
-              className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                gatewayConfig.gatewayType === 'simulator'
-                  ? 'bg-blue-600/15 border-blue-500 text-white shadow-md shadow-blue-500/10'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40'
+              onClick={() => onUpdateGateway({ ...gatewayConfig, gatewayType: 'whatsapp' })}
+              className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                gatewayConfig.gatewayType === 'whatsapp'
+                  ? 'bg-emerald-600/20 border-emerald-500 text-white shadow-lg shadow-emerald-950/30 ring-1 ring-emerald-500'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40 hover:border-emerald-500/40'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <MessageSquare className="w-5 h-5 text-emerald-400" />
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
+                  حقيقي ومجاني 100%
+                </span>
+                {gatewayConfig.gatewayType === 'whatsapp' && (
+                  <Check className="w-4 h-4 text-emerald-400" />
+                )}
+              </div>
+              <h4 className="font-bold text-sm text-slate-100">واتساب المباشر (WhatsApp Direct)</h4>
+              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                يصل فوراً لهاتف الموظف عبر تطبيق WhatsApp بنص الرسالة ورابط الشيفت بدون أي اشتراكات أو تكلفة رسائل.
+              </p>
+            </div>
+
+            {/* 2. Native Device SMS */}
+            <div
+              onClick={() => onUpdateGateway({ ...gatewayConfig, gatewayType: 'native_device' })}
+              className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                gatewayConfig.gatewayType === 'native_device'
+                  ? 'bg-blue-600/20 border-blue-500 text-white shadow-lg shadow-blue-950/30 ring-1 ring-blue-500'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40 hover:border-blue-500/40'
               }`}
             >
               <div className="flex items-center justify-between mb-2">
                 <Smartphone className="w-5 h-5 text-blue-400" />
-                {gatewayConfig.gatewayType === 'simulator' && (
-                  <Check className="w-4 h-4 text-blue-400" />
-                )}
-              </div>
-              <h4 className="font-bold text-sm text-slate-100">المحاكي المدمج (Simulator)</h4>
-              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                جاهز ومفعل فوراً للاختبار بدون أي تكلفة أو إعدادات خارجية مع شاشة محاكاة حية.
-              </p>
-            </div>
-
-            {/* 2. Twilio */}
-            <div
-              onClick={() => onUpdateGateway({ ...gatewayConfig, gatewayType: 'twilio' })}
-              className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                gatewayConfig.gatewayType === 'twilio'
-                  ? 'bg-blue-600/15 border-blue-500 text-white shadow-md shadow-blue-500/10'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <Key className="w-5 h-5 text-indigo-400" />
-                {gatewayConfig.gatewayType === 'twilio' && (
-                  <Check className="w-4 h-4 text-blue-400" />
-                )}
-              </div>
-              <h4 className="font-bold text-sm text-slate-100">بوابة Twilio الرسمية</h4>
-              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                إرسال دولي مباشر وموثوق عبر حسابك في Twilio مع تقارير التسليم الفورية.
-              </p>
-            </div>
-
-            {/* 3. Custom Webhook */}
-            <div
-              onClick={() => onUpdateGateway({ ...gatewayConfig, gatewayType: 'custom_webhook' })}
-              className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                gatewayConfig.gatewayType === 'custom_webhook'
-                  ? 'bg-blue-600/15 border-blue-500 text-white shadow-md shadow-blue-500/10'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <Globe className="w-5 h-5 text-emerald-400" />
-                {gatewayConfig.gatewayType === 'custom_webhook' && (
-                  <Check className="w-4 h-4 text-blue-400" />
-                )}
-              </div>
-              <h4 className="font-bold text-sm text-slate-100">بوابة Webhook / مزود محلي</h4>
-              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                ربط أي بوابة رسائل محلية (Vodafone, Orange, Taqnyat, Infobip, Unifonic).
-              </p>
-            </div>
-
-            {/* 4. Native Device */}
-            <div
-              onClick={() => onUpdateGateway({ ...gatewayConfig, gatewayType: 'native_device' })}
-              className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                gatewayConfig.gatewayType === 'native_device'
-                  ? 'bg-blue-600/15 border-blue-500 text-white shadow-md shadow-blue-500/10'
-                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <Smartphone className="w-5 h-5 text-amber-400" />
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300">
+                  شريحة هاتفك
+                </span>
                 {gatewayConfig.gatewayType === 'native_device' && (
                   <Check className="w-4 h-4 text-blue-400" />
                 )}
               </div>
-              <h4 className="font-bold text-sm text-slate-100">تطبيق الرسائل بالجهاز</h4>
+              <h4 className="font-bold text-sm text-slate-100">تطبيق الرسائل بالجهاز (Native SMS)</h4>
               <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                فتح تطبيق SMS في هاتفك أو جهازك برقم الموظف ونص الرسالة جاهز للإرسال.
+                يفتح تطبيق الـ SMS في هاتفك برقم الموظف ونص التذكير جاهزاً للإرسال من رصيد شريحتك مباشرة.
+              </p>
+            </div>
+
+            {/* 3. Simulator */}
+            <div
+              onClick={() => onUpdateGateway({ ...gatewayConfig, gatewayType: 'simulator' })}
+              className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                gatewayConfig.gatewayType === 'simulator'
+                  ? 'bg-slate-800 border-slate-600 text-white shadow-md'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <Smartphone className="w-5 h-5 text-slate-400" />
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                  تجريبي للشاشة فقط
+                </span>
+                {gatewayConfig.gatewayType === 'simulator' && (
+                  <Check className="w-4 h-4 text-slate-300" />
+                )}
+              </div>
+              <h4 className="font-bold text-sm text-slate-100">المحاكي الداخلي (Simulator)</h4>
+              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                مخصص لتجربة النظام واختبار فحص الشيت محلياً دون إرسال إشارات حقيقية لأبراج المحمول.
+              </p>
+            </div>
+
+            {/* 4. Custom Webhook / Egyptian SMS Gateway */}
+            <div
+              onClick={() => onUpdateGateway({ ...gatewayConfig, gatewayType: 'custom_webhook' })}
+              className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                gatewayConfig.gatewayType === 'custom_webhook'
+                  ? 'bg-indigo-600/20 border-indigo-500 text-white shadow-lg shadow-indigo-950/30 ring-1 ring-indigo-500'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40 hover:border-indigo-500/40'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <Globe className="w-5 h-5 text-indigo-400" />
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">
+                  إس إم إس مصر / تقنيات
+                </span>
+                {gatewayConfig.gatewayType === 'custom_webhook' && (
+                  <Check className="w-4 h-4 text-indigo-400" />
+                )}
+              </div>
+              <h4 className="font-bold text-sm text-slate-100">بوابة SMS محلية (Webhook API)</h4>
+              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                ربط حسابك في SMS Misr أو Taqnyat أو VictoryLink أو تطبيق Android Gateway للإرسال التلقائي المجمع.
+              </p>
+            </div>
+
+            {/* 5. Twilio */}
+            <div
+              onClick={() => onUpdateGateway({ ...gatewayConfig, gatewayType: 'twilio' })}
+              className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                gatewayConfig.gatewayType === 'twilio'
+                  ? 'bg-cyan-600/20 border-cyan-500 text-white shadow-lg shadow-cyan-950/30 ring-1 ring-cyan-500'
+                  : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/40 hover:border-cyan-500/40'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <Key className="w-5 h-5 text-cyan-400" />
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300">
+                  دولي معتمد
+                </span>
+                {gatewayConfig.gatewayType === 'twilio' && (
+                  <Check className="w-4 h-4 text-cyan-400" />
+                )}
+              </div>
+              <h4 className="font-bold text-sm text-slate-100">بوابة Twilio الرسمية</h4>
+              <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                إرسال دولي مباشر عبر حسابك في Twilio باستخدام Account SID و Auth Token ورقم الإرسال.
               </p>
             </div>
 

@@ -152,7 +152,27 @@ export async function sendSmsToEmployee(
     };
   }
 
-  // 2. NATIVE DEVICE SMS
+  // 2. WHATSAPP DIRECT DISPATCH (REAL & FREE)
+  if (gatewayConfig.gatewayType === 'whatsapp') {
+    if (typeof window !== 'undefined') {
+      const cleanPhone = employee.phone.replace(/[^\d]/g, '');
+      const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+      window.open(waUrl, '_blank');
+    }
+    return {
+      id: logId,
+      employeeId: employee.id,
+      employeeName: employee.name,
+      phone: employee.phone,
+      message,
+      status: 'delivered',
+      gateway: 'whatsapp',
+      timestamp,
+      autoTriggered,
+    };
+  }
+
+  // 3. NATIVE DEVICE SMS
   if (gatewayConfig.gatewayType === 'native_device') {
     if (typeof window !== 'undefined') {
       const smsUri = `sms:${employee.phone}?body=${encodeURIComponent(message)}`;

@@ -18,6 +18,8 @@ export interface SheetFetchResult {
   headers: string[];
   rawRows: string[][];
   dateColumns?: string[];
+  firstDate?: string;
+  targetDate?: string;
   sheetTitle: string;
   source: 'server_proxy_direct' | 'google_api' | 'gviz_public' | 'csv_public' | 'demo_fallback';
   message: string;
@@ -163,7 +165,8 @@ export function parseShiftStatus(value: string | undefined | null): 'unbooked' |
 export function rowsToEmployees(
   headers: string[],
   rows: string[][],
-  mapping: SheetColumnMapping
+  mapping: SheetColumnMapping,
+  targetDateParam?: string
 ): Employee[] {
   const nameIdx = headers.indexOf(mapping.nameCol);
   const phoneIdx = headers.indexOf(mapping.phoneCol);
@@ -182,6 +185,8 @@ export function rowsToEmployees(
     }
   });
 
+  const firstDate = dateColumns.length > 0 ? dateColumns[0].col : '';
+  const activeDate = targetDateParam || firstDate;
   const totalDays = dateColumns.length > 0 ? dateColumns.length : 6;
   const employees: Employee[] = [];
 
@@ -216,17 +221,13 @@ export function rowsToEmployees(
       .filter(([_, st]) => st === 'غير مختار')
       .map(([d]) => d);
 
-    // If selectedDaysCount === 0 -> unbooked
-    // If selectedDaysCount < totalDays -> unbooked
-    // If selectedDaysCount >= totalDays -> booked
-    let shiftStatus: 'unbooked' | 'booked' | 'excused' = 'unbooked';
-    if (selectedDaysCount >= totalDays) {
-      shiftStatus = 'booked';
-    } else if (parseShiftStatus(rawStatus) === 'excused') {
-      shiftStatus = 'excused';
-    } else {
-      shiftStatus = 'unbooked';
-    }
+    // Target date status
+    const targetDateStatus: 'مختار' | 'غير مختار' =
+      activeDate && dayStatuses[activeDate] === 'مختار' ? 'مختار' : 'غير مختار';
+
+    // Base shiftStatus on the target date (first date available)
+    const shiftStatus: 'unbooked' | 'booked' | 'excused' =
+      targetDateStatus === 'مختار' ? 'booked' : 'unbooked';
 
     if (name.trim() !== '' || phone.trim() !== '') {
       employees.push({
@@ -235,21 +236,20 @@ export function rowsToEmployees(
         phone: phone || rawPhone,
         rawPhone,
         shiftStatus,
+        targetDate: activeDate,
+        targetDateStatus,
         selectedDaysCount,
         totalShiftDays: totalDays,
         unbookedDaysCount: unbookedDaysList.length,
         unbookedDaysList,
         dayStatuses,
-        shiftDate:
-          unbookedDaysList.length > 0 ? unbookedDaysList.join(', ') : 'جميع الأيام محجوزة',
+        shiftDate: activeDate || (unbookedDaysList.length > 0 ? unbookedDaysList[0] : '2026/09/28'),
         shiftTime: 'وردية العمل المعتمدة',
         department: department || 'العمليات',
         notes:
-          selectedDaysCount === 0
-            ? 'غير مختار (0 من 6 أيام)'
-            : selectedDaysCount < totalDays
-            ? `غير مختار جزئياً (${selectedDaysCount} من ${totalDays} أيام مختارة)`
-            : 'مختار بالكامل (تم الحجز)',
+          targetDateStatus === 'غير مختار'
+            ? `غير مختار في تاريخ ${activeDate}`
+            : `مختار في تاريخ ${activeDate}`,
         smsCount: 0,
       });
     }
@@ -259,12 +259,17 @@ export function rowsToEmployees(
 }
 
 // Main fetch function with priority for Server Proxy
-export async function fetchGoogleSheetData(sheetIdOrUrl: string): Promise<SheetFetchResult> {
+export async function fetchGoogleSheetData(
+  sheetIdOrUrl: string,
+  targetDateParam?: string
+): Promise<SheetFetchResult> {
   const sheetId = extractSheetId(sheetIdOrUrl);
 
   // Strategy 1: Call Backend Server Proxy /api/sheet-data
   try {
-    const res = await fetch(`/api/sheet-data?sheetId=${encodeURIComponent(sheetId)}`);
+    const query = new URLSearchParams({ sheetId });
+    if (targetDateParam) query.append('targetDate', targetDateParam);
+    const res = await fetch(`/api/sheet-data?${query.toString()}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.employees && data.employees.length > 0) {
@@ -273,9 +278,11 @@ export async function fetchGoogleSheetData(sheetIdOrUrl: string): Promise<SheetF
           headers: data.headers,
           rawRows: data.rawRows,
           dateColumns: data.dateColumns,
+          firstDate: data.firstDate,
+          targetDate: data.targetDate,
           sheetTitle: data.sheetTitle || 'جدول شيفتات الموظفين',
           source: 'server_proxy_direct',
-          message: `تم جلب بيانات الشيت الحقيقية بنجاح (${data.employees.length} موظف، ${data.unbookedCount} غير مختار، ${data.bookedCount} مختار).`,
+          message: `تم سحب أول تاريخ متاح (${data.targetDate || data.firstDate}) بنجاح: ${data.unbookedCount} غير مختار و ${data.bookedCount} مختار.`,
         };
       }
     }

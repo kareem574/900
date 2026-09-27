@@ -41,10 +41,12 @@ import { SmsTemplateAndGateway } from './components/SmsTemplateAndGateway';
 import { SmsLogsTab } from './components/SmsLogsTab';
 import { GoogleSheetSettingsTab } from './components/GoogleSheetSettingsTab';
 import { ConfirmBatchModal } from './components/ConfirmBatchModal';
+import { SmsHelpModal } from './components/SmsHelpModal';
 
 export default function App() {
   // Navigation
   const [activeTab, setActiveTab] = useState<'employees' | 'scheduler' | 'template' | 'logs' | 'sheet'>('employees');
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   // Auth state
   const [user, setUser] = useState<User | null>(null);
@@ -54,6 +56,10 @@ export default function App() {
   const [sheetUrl, setSheetUrl] = useState<string>(() => {
     return localStorage.getItem('shift_sheet_url') || DEFAULT_SHEET_URL;
   });
+  const [targetDate, setTargetDate] = useState<string>(() => {
+    return localStorage.getItem('shift_target_date') || '2026/09/28';
+  });
+  const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<SheetColumnMapping>({
@@ -155,6 +161,10 @@ export default function App() {
   }, [sheetUrl]);
 
   useEffect(() => {
+    localStorage.setItem('shift_target_date', targetDate);
+  }, [targetDate]);
+
+  useEffect(() => {
     localStorage.setItem('shift_employees_cache', JSON.stringify(employees));
   }, [employees]);
 
@@ -193,14 +203,23 @@ export default function App() {
 
   // Load Sheet Data
   const loadSheet = useCallback(
-    async (showFeedback = false) => {
+    async (showFeedback = false, overrideDate?: string) => {
       setIsRefreshing(true);
       try {
-        const result = await fetchGoogleSheetData(sheetUrl);
+        const dateToFetch = overrideDate || targetDate;
+        const result = await fetchGoogleSheetData(sheetUrl, dateToFetch);
         setHeaders(result.headers);
         setRawRows(result.rawRows);
         setSheetSource(result.source);
         setSourceMessage(result.message);
+
+        if (result.dateColumns && result.dateColumns.length > 0) {
+          setAvailableDates(result.dateColumns);
+          const activeFirstDate =
+            overrideDate || result.targetDate || result.firstDate || result.dateColumns[0];
+          setTargetDate(activeFirstDate);
+          localStorage.setItem('shift_target_date', activeFirstDate);
+        }
 
         const newMapping = detectColumnMapping(result.headers);
         setMapping(newMapping);
@@ -224,7 +243,11 @@ export default function App() {
         });
 
         if (showFeedback) {
-          showToast(`تم تحديث بيانات الشيت بنجاح (${result.employees.length} موظف)`, 'success');
+          const unbookedCount = result.employees.filter((e) => e.shiftStatus === 'unbooked').length;
+          showToast(
+            `تم سحب أول تاريخ (${result.targetDate || targetDate}): ${unbookedCount} غير مختار`,
+            'success'
+          );
         }
       } catch (err: any) {
         console.error('Failed to load sheet:', err);
@@ -236,8 +259,14 @@ export default function App() {
         setIsRefreshing(false);
       }
     },
-    [sheetUrl, showToast]
+    [sheetUrl, targetDate, showToast]
   );
+
+  const handleSelectTargetDate = (newDate: string) => {
+    setTargetDate(newDate);
+    localStorage.setItem('shift_target_date', newDate);
+    loadSheet(true, newDate);
+  };
 
   // Initial Sheet Load on start
   useEffect(() => {
@@ -501,6 +530,7 @@ export default function App() {
         onRefreshSheet={() => loadSheet(true)}
         isRefreshing={isRefreshing}
         sheetSource={sheetSource}
+        onOpenHelpModal={() => setShowHelpModal(true)}
       />
 
       {/* Main Container */}
@@ -512,6 +542,9 @@ export default function App() {
           smsSentTodayCount={smsSentTodayCount}
           isAutoEnabled={schedulerConfig.isEnabled}
           nextRunSeconds={nextRunSeconds}
+          targetDate={targetDate}
+          availableDates={availableDates}
+          onSelectTargetDate={handleSelectTargetDate}
           onSendToAllUnbooked={() => handleOpenBatchConfirm()}
           onOpenSchedulerTab={() => setActiveTab('scheduler')}
         />
@@ -596,6 +629,9 @@ export default function App() {
         {activeTab === 'employees' && (
           <EmployeesList
             employees={employees}
+            targetDate={targetDate}
+            availableDates={availableDates}
+            onSelectTargetDate={handleSelectTargetDate}
             onSendSmsSingle={handleSendSmsSingle}
             onSendToAllUnbooked={handleOpenBatchConfirm}
             onUpdateEmployee={handleUpdateEmployee}
@@ -652,6 +688,26 @@ export default function App() {
         )}
 
       </main>
+
+      {/* Troubleshooting Guide Modal */}
+      <SmsHelpModal
+        isOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+        currentGateway={gatewayConfig.gatewayType}
+        onSelectGateway={(gw) => {
+          setGatewayConfig((prev) => ({ ...prev, gatewayType: gw }));
+          showToast(
+            `تم تفعيل طريقة الإرسال: ${
+              gw === 'whatsapp'
+                ? 'واتساب المباشر (مجاني وفوري)'
+                : gw === 'native_device'
+                ? 'رسائل الهاتف'
+                : gw
+            }`,
+            'success'
+          );
+        }}
+      />
 
       {/* Confirmation Modal for Batch SMS Sending */}
       <ConfirmBatchModal

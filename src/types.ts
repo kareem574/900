@@ -14,6 +14,8 @@ export interface Employee {
   totalShiftDays?: number;
   unbookedDaysCount?: number;
   unbookedDaysList?: string[];
+  targetDate?: string;
+  targetDateStatus?: 'مختار' | 'غير مختار';
   dayStatuses?: Record<string, 'مختار' | 'غير مختار'>;
   lastSmsSentAt?: string;
   smsCount?: number;
@@ -29,7 +31,7 @@ export interface SheetColumnMapping {
   deptCol?: string;
 }
 
-export type SmsGatewayType = 'simulator' | 'twilio' | 'custom_webhook' | 'native_device';
+export type SmsGatewayType = 'simulator' | 'whatsapp' | 'native_device' | 'twilio' | 'custom_webhook';
 
 export interface SmsGatewayConfig {
   gatewayType: SmsGatewayType;

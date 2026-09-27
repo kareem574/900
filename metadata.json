@@ -1,0 +1,6 @@
+{
+  "name": "ShiftSMS - نظام التذكير التلقائي بالشيفتات",
+  "description": "نظام ذكي متصل بـ Google Sheets لإرسال رسائل SMS تلقائية للموظفين الذين لم يحجزوا شيفتاتهم مع جدولة دورية وتنبيهات فورية.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

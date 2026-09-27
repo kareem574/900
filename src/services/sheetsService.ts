@@ -21,6 +21,7 @@ export interface SheetFetchResult {
   dateColumns?: string[];
   firstDate?: string;
   targetDate?: string;
+  lastSyncedAt?: string;
   sheetTitle: string;
   source: 'server_proxy_direct' | 'google_api' | 'gviz_public' | 'csv_public' | 'demo_fallback';
   message: string;
@@ -272,11 +273,21 @@ export async function fetchGoogleSheetData(
   const sheetId = extractSheetId(sheetIdOrUrl);
   const activeDate = targetDateParam || '2026/09/28';
 
-  // Strategy 1: Call Backend Server Proxy /api/sheet-data
+  // Strategy 1: Call Backend Server Proxy /api/sheet-data with strict no-cache
   try {
-    const query = new URLSearchParams({ sheetId });
+    const query = new URLSearchParams({
+      sheetId,
+      _t: String(Date.now()),
+      _bust: Math.random().toString(36).substring(7),
+    });
     if (targetDateParam) query.append('targetDate', targetDateParam);
-    const res = await fetch(`/api/sheet-data?${query.toString()}`);
+    const res = await fetch(`/api/sheet-data?${query.toString()}`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        Pragma: 'no-cache',
+      },
+    });
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.employees && data.employees.length > 0) {
@@ -287,9 +298,10 @@ export async function fetchGoogleSheetData(
           dateColumns: data.dateColumns,
           firstDate: data.firstDate,
           targetDate: data.targetDate,
+          lastSyncedAt: data.lastSyncedAt || new Date().toISOString(),
           sheetTitle: data.sheetTitle || 'جدول شيفتات الموظفين',
           source: 'server_proxy_direct',
-          message: `تم سحب البيانات الحقيقية بنجاح (${data.employees.length} موظف): ${data.unbookedCount} غير مختار و ${data.bookedCount} مختار في تاريخ ${data.targetDate || data.firstDate}.`,
+          message: `تم تحديث البيانات مباشرة وحياً من شيت جوجل (${data.employees.length} موظف): ${data.unbookedCount} غير مختار و ${data.bookedCount} مختار في تاريخ ${data.targetDate || data.firstDate}.`,
         };
       }
     }
@@ -369,3 +381,53 @@ export async function fetchGoogleSheetData(
     message: `تم تحميل البيانات الحقيقية من الشيت (${preloaded.length} موظف): ${unbooked} غير مختار و ${booked} مختار.`,
   };
 }
+
+// Download updated sheet with SMS dispatch logs and current status as CSV
+export function downloadUpdatedCsv(employees: Employee[], targetDate: string = '2026/09/28') {
+  const headers = [
+    'ID',
+    'الاسم',
+    'رقم الهاتف (محلي)',
+    'رقم الهاتف (دولي)',
+    'المنطقة',
+    'الفرع',
+    'اسم المشرف',
+    `الحالة في ${targetDate}`,
+    'عدد الأيام المختارة',
+    'أيام الشيفت غير المحجوزة',
+    'آخر رسالة SMS',
+    'عدد رسائل SMS المرسلة',
+    'ملاحظات',
+  ];
+
+  const rows = employees.map((emp) => [
+    emp.id,
+    `"${(emp.name || '').replace(/"/g, '""')}"`,
+    emp.localPhone || emp.phone,
+    emp.phone,
+    emp.area || '',
+    emp.zone || '',
+    emp.supervisor || '',
+    emp.shiftStatus === 'booked' ? 'مختار (محجوز)' : 'غير مختار',
+    emp.selectedDaysCount ?? '',
+    `"${(emp.unbookedDaysList || []).join(' | ')}"`,
+    emp.lastSmsSentAt ? new Date(emp.lastSmsSentAt).toLocaleString('ar-EG') : 'لم يتم الإرسال بعد',
+    emp.smsCount || 0,
+    `"${(emp.notes || '').replace(/"/g, '""')}"`,
+  ]);
+
+  const csvContent =
+    '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute(
+    'download',
+    `تحديث_شيت_الشيفتات_وحالة_SMS_${targetDate.replace(/[\/-]/g, '_')}.csv`
+  );
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+

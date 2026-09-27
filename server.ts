@@ -65,10 +65,21 @@ async function startServer() {
 
   // Backend API route to fetch and parse Google Sheet directly without CORS issues
   app.get('/api/sheet-data', async (req, res) => {
+    // Send strict no-cache headers so client and browser NEVER receive stale sheet data
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     const sheetId = (req.query.sheetId as string) || DEFAULT_SHEET_ID;
     try {
-      const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
-      const response = await fetch(csvUrl);
+      // Add timestamp and random nonce so Google CDN NEVER returns a cached copy
+      const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&t=${Date.now()}&_bust=${Math.random().toString(36).substring(7)}`;
+      const response = await fetch(csvUrl, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+      });
 
       if (!response.ok) {
         return res.status(response.status).json({
@@ -190,6 +201,7 @@ async function startServer() {
         employees,
         sheetTitle: 'جدول شيفتات الموظفين',
         source: 'server_proxy_direct',
+        lastSyncedAt: new Date().toISOString(),
       });
     } catch (err: any) {
       console.error('Error in /api/sheet-data:', err);

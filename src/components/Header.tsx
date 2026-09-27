@@ -29,6 +29,7 @@ interface HeaderProps {
   isRefreshing: boolean;
   sheetSource: string;
   onOpenHelpModal?: () => void;
+  lastSyncedTime?: string;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -45,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   isRefreshing,
   sheetSource,
   onOpenHelpModal,
+  lastSyncedTime,
 }) => {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -182,14 +184,22 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Sync / Refresh Button */}
+            {/* Sync / Refresh Button with Live Indicator */}
             <button
               onClick={onRefreshSheet}
               disabled={isRefreshing}
-              title="تحديث البيانات من شيت جوجل"
-              className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 transition-colors disabled:opacity-50"
+              title="تحديث فوري ومباشر من شيت جوجل الآن"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/40 transition-all disabled:opacity-50 cursor-pointer shadow-sm"
             >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
+              <span className="text-xs font-bold whitespace-nowrap">
+                {isRefreshing ? 'جارٍ التحديث...' : 'تحديث الشيت'}
+              </span>
+              {lastSyncedTime && !isRefreshing && (
+                <span className="text-[10px] text-blue-300/80 font-mono hidden sm:inline">
+                  ({lastSyncedTime})
+                </span>
+              )}
             </button>
 
             {/* Sound toggle */}

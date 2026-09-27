@@ -72,6 +72,7 @@ export default function App() {
   const [sheetSource, setSheetSource] = useState<string>('demo_fallback');
   const [sourceMessage, setSourceMessage] = useState<string>('جارٍ تهيئة الاتصال بالشيت...');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSyncedTime, setLastSyncedTime] = useState<string>('');
 
   // Employees data (Guaranteed real employees from the sheet)
   const [employees, setEmployees] = useState<Employee[]>(() => {
@@ -247,10 +248,17 @@ export default function App() {
           });
         }
 
+        const currentTime = new Date().toLocaleTimeString('ar-EG', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        });
+        setLastSyncedTime(currentTime);
+
         if (showFeedback) {
           const unbookedCount = result.employees.filter((e) => e.shiftStatus === 'unbooked').length;
           showToast(
-            `تم سحب أول تاريخ (${result.targetDate || targetDate}): ${unbookedCount} غير مختار`,
+            `تم التحديث المباشر من شيت جوجل بنجاح (${currentTime}) - ${unbookedCount} غير مختار`,
             'success'
           );
         }
@@ -536,6 +544,7 @@ export default function App() {
         isRefreshing={isRefreshing}
         sheetSource={sheetSource}
         onOpenHelpModal={() => setShowHelpModal(true)}
+        lastSyncedTime={lastSyncedTime}
       />
 
       {/* Main Container */}
@@ -689,6 +698,8 @@ export default function App() {
             onUpdateMapping={handleUpdateMapping}
             sheetSource={sheetSource}
             sourceMessage={sourceMessage}
+            employees={employees}
+            targetDate={targetDate}
           />
         )}
 

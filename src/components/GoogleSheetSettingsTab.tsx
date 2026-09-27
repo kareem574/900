@@ -10,8 +10,10 @@ import {
   Sliders,
 } from 'lucide-react';
 import { User } from 'firebase/auth';
-import { SheetColumnMapping } from '../types';
+import { SheetColumnMapping, Employee } from '../types';
 import { googleSignIn } from '../services/firebaseAuth';
+import { downloadUpdatedCsv } from '../services/sheetsService';
+import { Download } from 'lucide-react';
 
 interface GoogleSheetSettingsTabProps {
   sheetUrl: string;
@@ -27,6 +29,8 @@ interface GoogleSheetSettingsTabProps {
   onUpdateMapping: (m: SheetColumnMapping) => void;
   sheetSource: string;
   sourceMessage: string;
+  employees?: Employee[];
+  targetDate?: string;
 }
 
 export const GoogleSheetSettingsTab: React.FC<GoogleSheetSettingsTabProps> = ({
@@ -43,6 +47,8 @@ export const GoogleSheetSettingsTab: React.FC<GoogleSheetSettingsTabProps> = ({
   onUpdateMapping,
   sheetSource,
   sourceMessage,
+  employees = [],
+  targetDate = '2026/09/28',
 }) => {
   const [tempUrl, setTempUrl] = useState(sheetUrl);
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -105,6 +111,18 @@ export const GoogleSheetSettingsTab: React.FC<GoogleSheetSettingsTabProps> = ({
               <span>فتح الشيت في Google</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
+
+            {employees.length > 0 && (
+              <button
+                type="button"
+                onClick={() => downloadUpdatedCsv(employees, targetDate)}
+                title="تنزيل الشيت المحدث مع حالة رسائل SMS وتأكيد الحجز"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 text-xs font-bold border border-slate-700 transition-colors cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>تنزيل الشيت المحدث</span>
+              </button>
+            )}
 
             <button
               onClick={onRefreshData}

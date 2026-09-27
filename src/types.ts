@@ -2,6 +2,7 @@ export interface Employee {
   id: string;
   name: string;
   phone: string;
+  localPhone?: string;
   rawPhone?: string;
   shiftStatus: 'unbooked' | 'booked' | 'excused';
   shiftDate?: string;

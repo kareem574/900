@@ -227,13 +227,18 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
                           {emp.name.slice(0, 1)}
                         </div>
                         <div>
-                          <p className="font-semibold text-slate-100 flex items-center gap-2">
+                          <p className="font-bold text-slate-100 flex items-center gap-2">
                             {emp.name}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
                             {emp.id && (
-                              <span className="font-mono text-[11px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
-                                ID: {emp.id}
+                              <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                                كود ID: {emp.id}
+                              </span>
+                            )}
+                            {emp.selectedDaysCount !== undefined && (
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-blue-950/80 text-blue-300 font-semibold border border-blue-500/20">
+                                أيام مختارة: {emp.selectedDaysCount}
                               </span>
                             )}
                           </div>
@@ -244,16 +249,21 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
                     {/* Phone */}
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-semibold text-slate-200 dir-ltr text-right">
-                          {emp.phone || emp.rawPhone || 'بدون رقم'}
-                        </span>
+                        <div>
+                          <p className="font-mono text-xs font-bold text-slate-100 dir-ltr text-right">
+                            {emp.localPhone || (emp.rawPhone ? (emp.rawPhone.startsWith('0') ? emp.rawPhone : `0${emp.rawPhone}`) : emp.phone)}
+                          </p>
+                          <p className="font-mono text-[10px] text-slate-400 dir-ltr text-right">
+                            {emp.phone}
+                          </p>
+                        </div>
                         {emp.phone && (
                           <a
                             href={`https://wa.me/${emp.phone.replace(/[^\d]/g, '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             title="مراسلة سريعة عبر واتساب"
-                            className="p-1 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                            className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
                           >
                             <MessageSquare className="w-3.5 h-3.5" />
                           </a>

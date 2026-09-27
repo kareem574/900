@@ -31,6 +31,7 @@ import {
   fetchGoogleSheetData,
   detectColumnMapping,
   rowsToEmployees,
+  getPreloadedRealEmployees,
 } from './services/sheetsService';
 import { initAuth } from './services/firebaseAuth';
 import { Header } from './components/Header';
@@ -72,17 +73,20 @@ export default function App() {
   const [sourceMessage, setSourceMessage] = useState<string>('جارٍ تهيئة الاتصال بالشيت...');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Employees data
+  // Employees data (Guaranteed real employees from the sheet)
   const [employees, setEmployees] = useState<Employee[]>(() => {
     const saved = localStorage.getItem('shift_employees_cache');
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 70 && parsed[0]?.supervisor) {
+          return parsed;
+        }
       } catch (e) {
         // ignore
       }
     }
-    return [];
+    return getPreloadedRealEmployees('2026/09/28');
   });
 
   // SMS Gateway Config
@@ -224,23 +228,24 @@ export default function App() {
         const newMapping = detectColumnMapping(result.headers);
         setMapping(newMapping);
 
-        // Merge with existing employees to preserve SMS sent timestamps
-        setEmployees((prev) => {
-          if (prev.length === 0) return result.employees;
-          return result.employees.map((newEmp) => {
-            const existing = prev.find(
-              (p) => p.name === newEmp.name || (p.phone && p.phone === newEmp.phone)
-            );
-            if (existing) {
-              return {
-                ...newEmp,
-                lastSmsSentAt: existing.lastSmsSentAt,
-                smsCount: existing.smsCount,
-              };
-            }
-            return newEmp;
+        // Update employees from sheet while preserving SMS sent timestamps
+        if (result.employees && result.employees.length > 0) {
+          setEmployees((prev) => {
+            return result.employees.map((newEmp) => {
+              const existing = prev.find(
+                (p) => p.name === newEmp.name || (p.phone && p.phone === newEmp.phone)
+              );
+              if (existing) {
+                return {
+                  ...newEmp,
+                  lastSmsSentAt: existing.lastSmsSentAt,
+                  smsCount: existing.smsCount,
+                };
+              }
+              return newEmp;
+            });
           });
-        });
+        }
 
         if (showFeedback) {
           const unbookedCount = result.employees.filter((e) => e.shiftStatus === 'unbooked').length;

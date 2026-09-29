@@ -151,6 +151,7 @@ export default function App() {
     return (schedulerConfig.periodicSyncMinutes || 15) * 60;
   });
   const dataSyncTimerRef = useRef<any>(null);
+  const lastFocusSyncRef = useRef<number>(Date.now());
 
   // Show toast notification
   const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'info') => {
@@ -373,10 +374,12 @@ export default function App() {
     };
   }, [schedulerConfig.isEnabled, schedulerConfig.intervalMinutes, executeScheduledRun]);
 
-  // Refresh immediately when the user returns to the app or browser tab.
+  // Refresh smoothly when the user returns to the app (throttled to at least 15s between syncs)
   useEffect(() => {
     const refreshWhenActive = () => {
-      if (document.visibilityState === 'visible' && !isRefreshing) {
+      const now = Date.now();
+      if (document.visibilityState === 'visible' && !isRefreshing && now - lastFocusSyncRef.current > 15000) {
+        lastFocusSyncRef.current = now;
         loadSheet(false);
       }
     };

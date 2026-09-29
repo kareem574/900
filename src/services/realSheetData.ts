@@ -1,5 +1,5 @@
 // Real Google Sheet data snapshot from 1VXIMchmEibTeO9nRIiXjMK518BhLzwOHsxqci5fX4LE
-// Last updated: 2026-09-29T10:29:09.942Z
+// Last updated: 2026-09-29T10:45:25.680Z
 export const REAL_SHEET_HEADERS = [
   "ID",
   "Status",
@@ -1090,7 +1090,7 @@ export const REAL_SHEET_ROWS = [
     "Hiliopolise",
     "كريم شعبان محمود احمد",
     "1029228814",
-    "مختار",
+    "غير مختار",
     "غير مختار",
     "غير مختار",
     "غير مختار",

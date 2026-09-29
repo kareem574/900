@@ -274,7 +274,114 @@ export function getPreloadedRealEmployees(targetDateParam: string = '2026/09/30'
   return rowsToEmployees(REAL_SHEET_HEADERS, REAL_SHEET_ROWS, undefined, targetDateParam);
 }
 
-// Main fetch function with priority for Server Proxy
+// Ultra-fast direct client-side Google Sheets sync via JSONP (bypasses CORS, takes ~200ms)
+export function fetchSheetViaGvizJsonp(
+  sheetId: string
+): Promise<{ headers: string[]; rows: string[][] }> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return reject(new Error('Window or document not available'));
+    }
+
+    const callbackName = `gviz_cb_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const script = document.createElement('script');
+    script.async = true;
+
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('GViz JSONP timeout after 4500ms'));
+    }, 4500);
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      try {
+        delete (window as any)[callbackName];
+      } catch (e) {}
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+
+    (window as any)[callbackName] = (response: any) => {
+      cleanup();
+      try {
+        if (!response || !response.table || !response.table.rows) {
+          reject(new Error('Invalid GViz response format'));
+          return;
+        }
+
+        const rawRows = response.table.rows;
+        if (rawRows.length === 0) {
+          reject(new Error('No rows in GViz response'));
+          return;
+        }
+
+        // Header row: row 0 in sheet contains labels
+        const headerRow = rawRows[0]?.c || [];
+        const knownBaseHeaders = [
+          'ID',
+          'Status',
+          'name',
+          'area',
+          'zone',
+          'اسم المشرف',
+          'phone_number',
+        ];
+
+        const headers: string[] = [];
+        const maxCols = Math.max(headerRow.length, 13);
+        for (let c = 0; c < maxCols; c++) {
+          const cell = headerRow[c];
+          const val = cell ? String(cell.f || cell.v || '').trim() : '';
+          if (c < knownBaseHeaders.length && !val) {
+            headers[c] = knownBaseHeaders[c];
+          } else if (c === 12 && !val) {
+            headers[c] = 'عدد الأيام المختاره';
+          } else {
+            headers[c] = val || `Col_${c}`;
+          }
+        }
+
+        // Data rows: rows 1 to end
+        const rows: string[][] = [];
+        for (let r = 1; r < rawRows.length; r++) {
+          const rowCells = rawRows[r]?.c || [];
+          const row: string[] = [];
+          for (let c = 0; c < headers.length; c++) {
+            const cell = rowCells[c];
+            let val = '';
+            if (cell) {
+              if (cell.f !== undefined && cell.f !== null) {
+                val = String(cell.f).trim();
+              } else if (cell.v !== undefined && cell.v !== null) {
+                val = String(cell.v).trim();
+              }
+            }
+            row.push(val);
+          }
+          if (row.some((c) => c !== '')) {
+            rows.push(row);
+          }
+        }
+
+        resolve({ headers, rows });
+      } catch (err) {
+        reject(err);
+      }
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('GViz script network error'));
+    };
+
+    const bust = `${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    script.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=responseHandler:${callbackName}&_t=${bust}`;
+    document.head.appendChild(script);
+  });
+}
+
+// Main fetch function with multi-tier fast strategy (Direct Client GViz JSONP + Backend Proxy)
 export async function fetchGoogleSheetData(
   sheetIdOrUrl: string,
   targetDateParam?: string
@@ -282,21 +389,28 @@ export async function fetchGoogleSheetData(
   const sheetId = extractSheetId(sheetIdOrUrl);
   const activeDate = targetDateParam || '2026/09/30';
 
-  // Strategy 1: Call Backend Server Proxy /api/sheet-data with strict no-cache
+  // Strategy 1: Fast Backend Proxy /api/sheet-data with strict 1800ms timeout
   try {
+    const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 1800) : null;
+
     const query = new URLSearchParams({
       sheetId,
       _t: String(Date.now()),
       _bust: Math.random().toString(36).substring(7),
     });
     if (targetDateParam) query.append('targetDate', targetDateParam);
+
     const res = await fetch(`/api/sheet-data?${query.toString()}`, {
       cache: 'no-store',
+      signal: controller ? controller.signal : undefined,
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         Pragma: 'no-cache',
       },
     });
+    if (timeoutId) clearTimeout(timeoutId);
+
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.employees && data.employees.length > 0) {
@@ -315,10 +429,51 @@ export async function fetchGoogleSheetData(
       }
     }
   } catch (e) {
-    console.warn('Backend proxy fetch failed, falling back to guaranteed sheet snapshot:', e);
+    // If backend proxy is 404 or times out (common in published/static hosting), immediately fall through to Strategy 2
   }
 
-  // Strategy 2: Google Sheets API v4 using Bearer OAuth Token
+  // Strategy 2: Direct Client-Side GViz JSONP (Ultra-Fast ~200ms, bypasses CORS, works in published app)
+  try {
+    const gvizResult = await fetchSheetViaGvizJsonp(sheetId);
+    if (gvizResult.headers.length > 0 && gvizResult.rows.length > 0) {
+      const employees = rowsToEmployees(gvizResult.headers, gvizResult.rows, undefined, activeDate);
+
+      // Extract date columns
+      const dateColumns: string[] = [];
+      gvizResult.headers.forEach((h) => {
+        const clean = h.trim();
+        if (
+          /\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/.test(clean) ||
+          clean.toLowerCase().startsWith('day') ||
+          clean.includes('يوم')
+        ) {
+          dateColumns.push(clean);
+        }
+      });
+
+      const firstDate = dateColumns.length > 0 ? dateColumns[0] : '2026/09/30';
+      const effectiveDate = activeDate || firstDate;
+      const bookedCount = employees.filter((e) => e.shiftStatus === 'booked').length;
+      const unbookedCount = employees.filter((e) => e.shiftStatus === 'unbooked').length;
+
+      return {
+        employees,
+        headers: gvizResult.headers,
+        rawRows: gvizResult.rows,
+        dateColumns,
+        firstDate,
+        targetDate: effectiveDate,
+        lastSyncedAt: new Date().toISOString(),
+        sheetTitle: 'جدول شيفتات الموظفين',
+        source: 'gviz_public',
+        message: `تم التحديث الحي والمباشر من شيت جوجل فوراً (${employees.length} موظف): ${bookedCount} مختار و ${unbookedCount} غير مختار في تاريخ ${effectiveDate}.`,
+      };
+    }
+  } catch (gvizErr) {
+    console.warn('Direct GViz fetch error:', gvizErr);
+  }
+
+  // Strategy 3: Google Sheets API v4 using Bearer OAuth Token (if logged in)
   const accessToken = await getAccessToken();
   if (accessToken) {
     try {
@@ -359,7 +514,7 @@ export async function fetchGoogleSheetData(
               employees,
               headers,
               rawRows: rows,
-              firstDate: '2026/09/28',
+              firstDate: '2026/09/30',
               targetDate: activeDate,
               sheetTitle: firstSheet,
               source: 'google_api',
@@ -373,7 +528,7 @@ export async function fetchGoogleSheetData(
     }
   }
 
-  // Guaranteed Strategy 3: Real sheet snapshot with all 72 employees
+  // Guaranteed Strategy 4: Real sheet snapshot with all 72 employees
   const preloaded = rowsToEmployees(REAL_SHEET_HEADERS, REAL_SHEET_ROWS, undefined, activeDate);
   const unbooked = preloaded.filter((e) => e.shiftStatus === 'unbooked').length;
   const booked = preloaded.filter((e) => e.shiftStatus === 'booked').length;

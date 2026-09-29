@@ -31,6 +31,8 @@ interface EmployeesListProps {
   onUpdateEmployee: (updated: Employee) => void;
   onAddEmployee: (emp: Employee) => void;
   sendingId: string | null;
+  activeFilter?: 'all' | 'unbooked' | 'booked' | 'zero_days' | 'has_any_booking';
+  onFilterChange?: (filter: 'all' | 'unbooked' | 'booked' | 'zero_days' | 'has_any_booking') => void;
 }
 
 export const EmployeesList: React.FC<EmployeesListProps> = ({
@@ -43,8 +45,15 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
   onUpdateEmployee,
   onAddEmployee,
   sendingId,
+  activeFilter,
+  onFilterChange,
 }) => {
-  const [filter, setFilter] = useState<'all' | 'unbooked' | 'booked' | 'zero_days' | 'has_any_booking'>('unbooked');
+  const [internalFilter, setInternalFilter] = useState<'all' | 'unbooked' | 'booked' | 'zero_days' | 'has_any_booking'>('all');
+  const filter = activeFilter !== undefined ? activeFilter : internalFilter;
+  const setFilter = (val: 'all' | 'unbooked' | 'booked' | 'zero_days' | 'has_any_booking') => {
+    if (onFilterChange) onFilterChange(val);
+    setInternalFilter(val);
+  };
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
@@ -135,10 +144,36 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
         {/* Row 2: Status Filter Tabs */}
         <div className="flex items-center gap-2 p-1.5 bg-slate-950/80 border border-slate-800 rounded-2xl overflow-x-auto text-xs font-semibold">
           <button
+            onClick={() => setFilter('all')}
+            className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
+              filter === 'all'
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+            }`}
+          >
+            جميع الموظفين ({employees.length})
+          </button>
+
+          <button
+            onClick={() => setFilter('booked')}
+            className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              filter === 'booked'
+                ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 font-bold'
+                : 'text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/20'
+            }`}
+          >
+            <Check className="w-3.5 h-3.5 text-emerald-300" />
+            <span>المختارون في أول تاريخ ({targetDate})</span>
+            <span className="px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-200 text-xs font-mono font-bold">
+              {bookedCount} موظف
+            </span>
+          </button>
+
+          <button
             onClick={() => setFilter('unbooked')}
             className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               filter === 'unbooked'
-                ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 font-bold'
                 : 'text-rose-400 hover:bg-rose-500/10'
             }`}
           >
@@ -165,21 +200,6 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
           </button>
 
           <button
-            onClick={() => setFilter('booked')}
-            className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
-              filter === 'booked'
-                ? 'bg-emerald-600 text-white shadow-md'
-                : 'text-emerald-400 hover:bg-emerald-500/10'
-            }`}
-          >
-            <Check className="w-3.5 h-3.5" />
-            <span>مختار في تاريخ {targetDate}</span>
-            <span className="px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-200 text-xs font-mono font-bold">
-              {bookedCount} موظف
-            </span>
-          </button>
-
-          <button
             onClick={() => setFilter('has_any_booking')}
             className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               filter === 'has_any_booking'
@@ -190,17 +210,54 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
             <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400" />
             <span>حجزوا بالأسبوع ({anyBookedCount})</span>
           </button>
+        </div>
 
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-xl transition-all whitespace-nowrap cursor-pointer ${
-              filter === 'all'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-            }`}
-          >
-            جميع الموظفين ({employees.length})
-          </button>
+        {/* Target Date Live Status Summary Strip */}
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-950/90 rounded-xl border border-slate-800 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-slate-300 font-medium">سحب من أول تاريخ بالشيت:</span>
+            <span className="font-mono font-black text-blue-400 text-sm px-2 py-0.5 rounded bg-blue-500/10 border border-blue-500/20">
+              {targetDate}
+            </span>
+            <span className="text-[11px] text-slate-400">
+              (مطابق لشيت جوجل: {bookedCount} مختار / {unbookedCount} غير مختار)
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 text-xs">تصفية العرض:</span>
+            <button
+              onClick={() => setFilter('booked')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                filter === 'booked'
+                  ? 'bg-emerald-600 text-white shadow'
+                  : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30'
+              }`}
+            >
+              المختارون ({bookedCount})
+            </button>
+            <button
+              onClick={() => setFilter('unbooked')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                filter === 'unbooked'
+                  ? 'bg-rose-600 text-white shadow'
+                  : 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border border-rose-500/30'
+              }`}
+            >
+              غير المختارين ({unbookedCount})
+            </button>
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                filter === 'all'
+                  ? 'bg-blue-600 text-white shadow'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              الكل ({employees.length})
+            </button>
+          </div>
         </div>
 
       </div>

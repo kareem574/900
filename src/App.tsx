@@ -59,13 +59,7 @@ export default function App() {
   const [sheetUrl, setSheetUrl] = useState<string>(() => {
     return localStorage.getItem('shift_sheet_url') || DEFAULT_SHEET_URL;
   });
-  const [targetDate, setTargetDate] = useState<string>(() => {
-    const saved = localStorage.getItem('shift_target_date');
-    if (saved && (saved.includes('2026/09/30') || saved.includes('2026/10/'))) {
-      return saved;
-    }
-    return '2026/09/30';
-  });
+  const [targetDate, setTargetDate] = useState<string>('2026/09/30');
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<string[][]>([]);
@@ -79,25 +73,10 @@ export default function App() {
   const [sourceMessage, setSourceMessage] = useState<string>('جارٍ تهيئة الاتصال بالشيت...');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string>('');
+  const [activeListFilter, setActiveListFilter] = useState<'all' | 'unbooked' | 'booked' | 'zero_days' | 'has_any_booking'>('all');
 
-  // Employees data (Guaranteed real employees from the sheet)
+  // Employees data (Guaranteed real employees from the sheet: 8 booked & 64 unbooked on 2026/09/30)
   const [employees, setEmployees] = useState<Employee[]>(() => {
-    const saved = localStorage.getItem('shift_employees_cache');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (
-          Array.isArray(parsed) &&
-          parsed.length >= 70 &&
-          parsed[0]?.targetDate &&
-          (parsed[0].targetDate.includes('2026/09/30') || parsed[0].targetDate.includes('2026/10/'))
-        ) {
-          return parsed;
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
     return getPreloadedRealEmployees('2026/09/30');
   });
 
@@ -232,7 +211,7 @@ export default function App() {
     async (showFeedback = false, overrideDate?: string) => {
       setIsRefreshing(true);
       try {
-        const dateToFetch = overrideDate || targetDate;
+        const dateToFetch = overrideDate;
         const result = await fetchGoogleSheetData(sheetUrl, dateToFetch);
         setHeaders(result.headers);
         setRawRows(result.rawRows);
@@ -241,17 +220,8 @@ export default function App() {
 
         if (result.dateColumns && result.dateColumns.length > 0) {
           setAvailableDates(result.dateColumns);
-          let activeFirstDate = overrideDate;
-          if (!activeFirstDate) {
-            if (targetDate && result.dateColumns.includes(targetDate)) {
-              activeFirstDate = targetDate;
-            } else {
-              activeFirstDate =
-                result.targetDate && result.dateColumns.includes(result.targetDate)
-                  ? result.targetDate
-                  : result.firstDate || result.dateColumns[0];
-            }
-          }
+          const firstDateInSheet = result.firstDate || result.dateColumns[0];
+          const activeFirstDate = overrideDate || firstDateInSheet;
           setTargetDate(activeFirstDate);
           localStorage.setItem('shift_target_date', activeFirstDate);
         }
@@ -641,6 +611,14 @@ export default function App() {
           onSendToAllUnbooked={() => handleOpenBatchConfirm()}
           onOpenSchedulerTab={() => setActiveTab('scheduler')}
           onOpenAnalyticsTab={() => setActiveTab('analytics')}
+          onViewBooked={() => {
+            setActiveTab('employees');
+            setActiveListFilter('booked');
+          }}
+          onViewUnbooked={() => {
+            setActiveTab('employees');
+            setActiveListFilter('unbooked');
+          }}
         />
 
         {/* Navigation Tabs Bar */}
@@ -746,6 +724,8 @@ export default function App() {
             onUpdateEmployee={handleUpdateEmployee}
             onAddEmployee={handleAddEmployee}
             sendingId={sendingId}
+            activeFilter={activeListFilter}
+            onFilterChange={setActiveListFilter}
           />
         )}
 

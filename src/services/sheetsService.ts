@@ -170,29 +170,33 @@ export function rowsToEmployees(
   // Find all date columns
   const dateColumns: { col: string; idx: number }[] = [];
   headers.forEach((h, idx) => {
+    const clean = h.trim();
     if (
-      /\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/.test(h) ||
-      h.toLowerCase().startsWith('day') ||
-      h.includes('يوم')
+      /\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/.test(clean) ||
+      clean.toLowerCase().startsWith('day') ||
+      clean.includes('يوم')
     ) {
-      dateColumns.push({ col: h, idx });
+      dateColumns.push({ col: clean, idx });
     }
   });
 
-  const firstDate = dateColumns.length > 0 ? dateColumns[0].col : '2026/09/28';
-  const activeDate = targetDateParam || firstDate;
+  const firstDate = dateColumns.length > 0 ? dateColumns[0].col : '2026/09/30';
+  const activeDate =
+    targetDateParam && dateColumns.some((d) => d.col === targetDateParam)
+      ? targetDateParam
+      : firstDate;
   const totalDays = dateColumns.length > 0 ? dateColumns.length : 5;
   const employees: Employee[] = [];
 
   rows.forEach((row, i) => {
-    const id = idIdx >= 0 && row[idIdx] ? row[idIdx] : `emp-${i + 1}`;
+    const id = idIdx >= 0 && row[idIdx] ? row[idIdx].trim() : `emp-${i + 1}`;
     const rawName = (nameIdx >= 0 ? row[nameIdx] : '') || `موظف #${i + 1}`;
     const rawPhone = (phoneIdx >= 0 ? row[phoneIdx] : '') || '';
     const phoneInfo = formatPhoneNumber(rawPhone);
-    const supervisor = supervisorIdx >= 0 ? row[supervisorIdx] : 'كريم شعبان محمود احمد';
-    const area = areaIdx >= 0 ? row[areaIdx] : 'Masre Elgdeda';
-    const zone = zoneIdx >= 0 ? row[zoneIdx] : 'Hiliopolise';
-    const rawSelected = totalSelectedIdx >= 0 ? parseInt(row[totalSelectedIdx]) : NaN;
+    const supervisor = supervisorIdx >= 0 ? row[supervisorIdx].trim() : 'كريم شعبان محمود احمد';
+    const area = areaIdx >= 0 ? row[areaIdx].trim() : 'Masre Elgdeda';
+    const zone = zoneIdx >= 0 ? row[zoneIdx].trim() : 'Hiliopolise';
+    const rawSelected = totalSelectedIdx >= 0 ? parseInt(row[totalSelectedIdx], 10) : NaN;
 
     // Day-by-day mapping
     const dayStatuses: Record<string, 'مختار' | 'غير مختار'> = {};
@@ -200,11 +204,16 @@ export function rowsToEmployees(
     let unbookedCount = 0;
 
     dateColumns.forEach(({ col, idx }) => {
-      const cellVal = (row[idx] || '').trim();
+      const cellVal = (row[idx] || '').trim().replace(/[\r\n]/g, '');
       // User rule:
       // "غير مختار" = كده ده مش مختار
       // "مختار" = ده كده مختار
-      if (cellVal === 'مختار' || cellVal.toLowerCase() === 'booked') {
+      if (
+        cellVal === 'مختار' ||
+        (cellVal.includes('مختار') && !cellVal.includes('غير')) ||
+        cellVal.toLowerCase() === 'booked' ||
+        cellVal === 'حجز'
+      ) {
         dayStatuses[col] = 'مختار';
         bookedCount++;
       } else {
@@ -246,7 +255,7 @@ export function rowsToEmployees(
         unbookedDaysCount: unbookedDaysList.length,
         unbookedDaysList,
         dayStatuses,
-        shiftDate: activeDate || (unbookedDaysList.length > 0 ? unbookedDaysList[0] : '2026/09/28'),
+        shiftDate: activeDate || (unbookedDaysList.length > 0 ? unbookedDaysList[0] : '2026/09/30'),
         shiftTime: 'وردية العمل المعتمدة',
         notes:
           targetDateStatus === 'غير مختار'
@@ -261,7 +270,7 @@ export function rowsToEmployees(
 }
 
 // Synchronous helper to get real preloaded 72 employees immediately on initial render
-export function getPreloadedRealEmployees(targetDateParam: string = '2026/09/28'): Employee[] {
+export function getPreloadedRealEmployees(targetDateParam: string = '2026/09/30'): Employee[] {
   return rowsToEmployees(REAL_SHEET_HEADERS, REAL_SHEET_ROWS, undefined, targetDateParam);
 }
 
@@ -271,7 +280,7 @@ export async function fetchGoogleSheetData(
   targetDateParam?: string
 ): Promise<SheetFetchResult> {
   const sheetId = extractSheetId(sheetIdOrUrl);
-  const activeDate = targetDateParam || '2026/09/28';
+  const activeDate = targetDateParam || '2026/09/30';
 
   // Strategy 1: Call Backend Server Proxy /api/sheet-data with strict no-cache
   try {
@@ -373,17 +382,17 @@ export async function fetchGoogleSheetData(
     employees: preloaded,
     headers: REAL_SHEET_HEADERS,
     rawRows: REAL_SHEET_ROWS,
-    dateColumns: ['2026/09/28', '2026/09/29', '2026/09/30', '2026/10/01', '2026/10/02'],
-    firstDate: '2026/09/28',
+    dateColumns: ['2026/09/30', '2026/10/01', '2026/10/02', '2026/10/03', '2026/10/04'],
+    firstDate: '2026/09/30',
     targetDate: activeDate,
     sheetTitle: 'جدول شيفتات الموظفين',
     source: 'demo_fallback',
-    message: `تم تحميل البيانات الحقيقية من الشيت (${preloaded.length} موظف): ${unbooked} غير مختار و ${booked} مختار.`,
+    message: `تم تحميل البيانات الحقيقية من الشيت (${preloaded.length} موظف): ${unbooked} غير مختار و ${booked} مختار في تاريخ ${activeDate}.`,
   };
 }
 
 // Download updated sheet with SMS dispatch logs and current status as CSV
-export function downloadUpdatedCsv(employees: Employee[], targetDate: string = '2026/09/28') {
+export function downloadUpdatedCsv(employees: Employee[], targetDate: string = '2026/09/30') {
   const headers = [
     'ID',
     'الاسم',

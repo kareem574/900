@@ -68,11 +68,72 @@ export interface SmsLogEntry {
 }
 
 export interface SchedulerConfig {
-  isEnabled: boolean;
-  intervalMinutes: number; // e.g. 15, 30, 60, 360, 1440
+  isEnabled: boolean; // Auto-SMS dispatch enabled
+  intervalMinutes: number; // SMS dispatch interval in minutes (default 15)
   dailySpecificTime?: string; // e.g. "09:00"
   cooldownHours: number; // Do not resend to same person within X hours
-  autoSyncSheet: boolean;
+  autoSyncSheet: boolean; // Sync sheet before auto SMS dispatch
+  autoSyncDataEnabled: boolean; // Periodic automatic data sync from Google Sheet
+  periodicSyncMinutes: number; // Periodic sheet sync interval in minutes (default 15)
   notifyOnSend: boolean;
   soundEnabled: boolean;
 }
+
+export interface SupervisorMetric {
+  name: string;
+  total: number;
+  booked: number;
+  unbooked: number;
+  complianceRate: number;
+}
+
+export interface DateMetric {
+  date: string;
+  booked: number;
+  unbooked: number;
+  rate: number;
+}
+
+export interface AreaMetric {
+  area: string;
+  total: number;
+  booked: number;
+  unbooked: number;
+}
+
+export interface CommitmentTier {
+  tierName: string;
+  daysLabel: string;
+  count: number;
+  percentage: number;
+  colorClass: string;
+  badgeClass: string;
+  description: string;
+}
+
+export interface ShiftAnalyticsData {
+  totalEmployees: number;
+  targetDate: string;
+  bookedTargetDate: number;
+  unbookedTargetDate: number;
+  targetDateRate: number;
+  totalPossibleSlots: number;
+  totalBookedSlots: number;
+  overallBookingRate: number;
+  avgDaysPerEmployee: number;
+  zeroDaysCount: number;
+  partialDaysCount: number;
+  fullDaysCount: number;
+  supervisors: SupervisorMetric[];
+  dates: DateMetric[];
+  areas: AreaMetric[];
+  tiers: CommitmentTier[];
+  smsSummary: {
+    totalSent: number;
+    delivered: number;
+    failed: number;
+    todaySent: number;
+    deliveryRate: number;
+  };
+}
+

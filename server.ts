@@ -103,28 +103,34 @@ async function startServer() {
       // Identify shift date columns (all columns that look like dates or 'Day')
       const dateColumns: { col: string; idx: number }[] = [];
       headers.forEach((h, idx) => {
+        const clean = h.trim();
         if (
-          /\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/.test(h) ||
-          h.toLowerCase().startsWith('day') ||
-          h.includes('يوم')
+          /\d{4}[\/-]\d{1,2}[\/-]\d{1,2}/.test(clean) ||
+          clean.toLowerCase().startsWith('day') ||
+          clean.includes('يوم')
         ) {
-          dateColumns.push({ col: h, idx });
+          dateColumns.push({ col: clean, idx });
         }
       });
 
       // Extract first date available
-      const firstDate = dateColumns.length > 0 ? dateColumns[0].col : '';
-      const requestedDate = (req.query.targetDate as string) || firstDate;
+      const firstDate = dateColumns.length > 0 ? dateColumns[0].col : '2026/09/30';
+      const requestedParam = (req.query.targetDate as string || '').trim();
+      // CRITICAL FIX: If requested target date is not in sheet dateColumns, fallback to first real date
+      const requestedDate =
+        requestedParam && dateColumns.some((d) => d.col === requestedParam)
+          ? requestedParam
+          : firstDate;
 
       const employees = rows.map((row, rIdx) => {
-        const id = idIdx >= 0 && row[idIdx] ? row[idIdx] : `emp-${rIdx + 1}`;
-        const name = nameIdx >= 0 && row[nameIdx] ? row[nameIdx] : `موظف #${rIdx + 1}`;
-        const rawPhone = phoneIdx >= 0 ? row[phoneIdx] : '';
+        const id = idIdx >= 0 && row[idIdx] ? row[idIdx].trim() : `emp-${rIdx + 1}`;
+        const name = nameIdx >= 0 && row[nameIdx] ? row[nameIdx].trim() : `موظف #${rIdx + 1}`;
+        const rawPhone = phoneIdx >= 0 ? row[phoneIdx].trim() : '';
         const phone = formatEgyptPhone(rawPhone);
-        const supervisor = supervisorIdx >= 0 ? row[supervisorIdx] : '';
-        const area = areaIdx >= 0 ? row[areaIdx] : '';
-        const zone = zoneIdx >= 0 ? row[zoneIdx] : '';
-        const rawSelectedCount = totalSelectedIdx >= 0 ? parseInt(row[totalSelectedIdx]) : NaN;
+        const supervisor = supervisorIdx >= 0 ? row[supervisorIdx].trim() : '';
+        const area = areaIdx >= 0 ? row[areaIdx].trim() : '';
+        const zone = zoneIdx >= 0 ? row[zoneIdx].trim() : '';
+        const rawSelectedCount = totalSelectedIdx >= 0 ? parseInt(row[totalSelectedIdx].trim(), 10) : NaN;
 
         // Day by day statuses
         const dayStatuses: Record<string, 'مختار' | 'غير مختار'> = {};
@@ -132,11 +138,11 @@ async function startServer() {
         let bookedDaysCount = 0;
 
         dateColumns.forEach(({ col, idx }) => {
-          const val = (row[idx] || '').trim();
+          const val = (row[idx] || '').trim().replace(/[\r\n]/g, '');
           // User rule:
           // "غير مختار" = كده ده مش مختار
           // "مختار" = ده كده مختار
-          if (val === 'مختار' || val.toLowerCase() === 'booked' || val === 'حجز') {
+          if (val === 'مختار' || (val.includes('مختار') && !val.includes('غير')) || val.toLowerCase() === 'booked' || val === 'حجز') {
             dayStatuses[col] = 'مختار';
             bookedDaysCount++;
           } else {
@@ -146,13 +152,13 @@ async function startServer() {
         });
 
         const selectedDays = !isNaN(rawSelectedCount) ? rawSelectedCount : bookedDaysCount;
-        const totalDays = dateColumns.length > 0 ? dateColumns.length : 6;
+        const totalDays = dateColumns.length > 0 ? dateColumns.length : 5;
 
-        // Target Date status (first date in sheet by default)
+        // Target Date status (effective date in sheet)
         const targetDateStatus: 'مختار' | 'غير مختار' =
           requestedDate && dayStatuses[requestedDate] === 'مختار' ? 'مختار' : 'غير مختار';
 
-        // Base shiftStatus on the target date (first date available) as requested by user
+        // Base shiftStatus on the target date as requested by user
         const shiftStatus: 'unbooked' | 'booked' | 'excused' =
           targetDateStatus === 'مختار' ? 'booked' : 'unbooked';
 
@@ -177,7 +183,7 @@ async function startServer() {
           unbookedDaysCount,
           unbookedDaysList,
           dayStatuses,
-          shiftDate: requestedDate || (unbookedDaysList.length > 0 ? unbookedDaysList[0] : '2026/09/28'),
+          shiftDate: requestedDate || (unbookedDaysList.length > 0 ? unbookedDaysList[0] : '2026/09/30'),
           shiftTime: 'وردية العمل المعتمدة',
           smsCount: 0,
           notes:

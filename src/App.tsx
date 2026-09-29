@@ -9,6 +9,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Zap,
+  BarChart3,
 } from 'lucide-react';
 import {
   Employee,
@@ -37,6 +38,7 @@ import { initAuth } from './services/firebaseAuth';
 import { Header } from './components/Header';
 import { StatCards } from './components/StatCards';
 import { EmployeesList } from './components/EmployeesList';
+import { AnalyticsTab } from './components/AnalyticsTab';
 import { SchedulerTab } from './components/SchedulerTab';
 import { SmsTemplateAndGateway } from './components/SmsTemplateAndGateway';
 import { SmsLogsTab } from './components/SmsLogsTab';
@@ -46,7 +48,7 @@ import { SmsHelpModal } from './components/SmsHelpModal';
 
 export default function App() {
   // Navigation
-  const [activeTab, setActiveTab] = useState<'employees' | 'scheduler' | 'template' | 'logs' | 'sheet'>('employees');
+  const [activeTab, setActiveTab] = useState<'employees' | 'analytics' | 'scheduler' | 'template' | 'logs' | 'sheet'>('employees');
   const [showHelpModal, setShowHelpModal] = useState(false);
 
   // Auth state
@@ -58,7 +60,11 @@ export default function App() {
     return localStorage.getItem('shift_sheet_url') || DEFAULT_SHEET_URL;
   });
   const [targetDate, setTargetDate] = useState<string>(() => {
-    return localStorage.getItem('shift_target_date') || '2026/09/28';
+    const saved = localStorage.getItem('shift_target_date');
+    if (saved && (saved.includes('2026/09/30') || saved.includes('2026/10/'))) {
+      return saved;
+    }
+    return '2026/09/30';
   });
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -80,14 +86,19 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 70 && parsed[0]?.supervisor) {
+        if (
+          Array.isArray(parsed) &&
+          parsed.length >= 70 &&
+          parsed[0]?.targetDate &&
+          (parsed[0].targetDate.includes('2026/09/30') || parsed[0].targetDate.includes('2026/10/'))
+        ) {
           return parsed;
         }
       } catch (e) {
         // ignore
       }
     }
-    return getPreloadedRealEmployees('2026/09/28');
+    return getPreloadedRealEmployees('2026/09/30');
   });
 
   // SMS Gateway Config
@@ -122,9 +133,11 @@ export default function App() {
     }
     return {
       isEnabled: true, // Default to true as user requested automatic sending
-      intervalMinutes: 30,
+      intervalMinutes: 15, // Default to 15 minutes as requested
       cooldownHours: 12,
       autoSyncSheet: true,
+      autoSyncDataEnabled: true, // Periodic sheet data sync
+      periodicSyncMinutes: 15, // Sync sheet every 15 minutes
       notifyOnSend: true,
       soundEnabled: true,
     };
@@ -148,9 +161,17 @@ export default function App() {
   const [batchRecipients, setBatchRecipients] = useState<Employee[]>([]);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
 
-  // Scheduler timer in seconds
-  const [nextRunSeconds, setNextRunSeconds] = useState<number>(30 * 60);
+  // Scheduler timer in seconds (SMS Auto Dispatch)
+  const [nextRunSeconds, setNextRunSeconds] = useState<number>(() => {
+    return (schedulerConfig.intervalMinutes || 15) * 60;
+  });
   const schedulerTimerRef = useRef<any>(null);
+
+  // Periodic Sheet Data Sync timer in seconds (Data Sync Loop)
+  const [nextSyncSeconds, setNextSyncSeconds] = useState<number>(() => {
+    return (schedulerConfig.periodicSyncMinutes || 15) * 60;
+  });
+  const dataSyncTimerRef = useRef<any>(null);
 
   // Show toast notification
   const showToast = useCallback((text: string, type: 'success' | 'info' | 'error' = 'info') => {
@@ -220,8 +241,17 @@ export default function App() {
 
         if (result.dateColumns && result.dateColumns.length > 0) {
           setAvailableDates(result.dateColumns);
-          const activeFirstDate =
-            overrideDate || result.targetDate || result.firstDate || result.dateColumns[0];
+          let activeFirstDate = overrideDate;
+          if (!activeFirstDate) {
+            if (targetDate && result.dateColumns.includes(targetDate)) {
+              activeFirstDate = targetDate;
+            } else {
+              activeFirstDate =
+                result.targetDate && result.dateColumns.includes(result.targetDate)
+                  ? result.targetDate
+                  : result.firstDate || result.dateColumns[0];
+            }
+          }
           setTargetDate(activeFirstDate);
           localStorage.setItem('shift_target_date', activeFirstDate);
         }
@@ -372,6 +402,36 @@ export default function App() {
       if (schedulerTimerRef.current) clearInterval(schedulerTimerRef.current);
     };
   }, [schedulerConfig.isEnabled, schedulerConfig.intervalMinutes, executeScheduledRun]);
+
+  // Periodic Sheet Data Sync Loop (runs independently of auto SMS dispatch)
+  useEffect(() => {
+    if (schedulerConfig.autoSyncDataEnabled === false) {
+      if (dataSyncTimerRef.current) clearInterval(dataSyncTimerRef.current);
+      return;
+    }
+
+    const intervalSecs = (schedulerConfig.periodicSyncMinutes || 15) * 60;
+    dataSyncTimerRef.current = setInterval(() => {
+      setNextSyncSeconds((prev) => {
+        if (prev <= 1) {
+          loadSheet(false).then(() => {
+            const timeStr = new Date().toLocaleTimeString('ar-EG', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            });
+            showToast(`🔄 تم التحديث الدوري للشيت تلقائياً (${timeStr})`, 'info');
+          });
+          return intervalSecs;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (dataSyncTimerRef.current) clearInterval(dataSyncTimerRef.current);
+    };
+  }, [schedulerConfig.autoSyncDataEnabled, schedulerConfig.periodicSyncMinutes, loadSheet, showToast]);
 
   // Single SMS dispatch handler
   const handleSendSmsSingle = async (employee: Employee) => {
@@ -545,6 +605,9 @@ export default function App() {
         sheetSource={sheetSource}
         onOpenHelpModal={() => setShowHelpModal(true)}
         lastSyncedTime={lastSyncedTime}
+        periodicSyncMinutes={schedulerConfig.periodicSyncMinutes || 15}
+        nextSyncSeconds={nextSyncSeconds}
+        autoSyncDataEnabled={schedulerConfig.autoSyncDataEnabled !== false}
       />
 
       {/* Main Container */}
@@ -561,6 +624,7 @@ export default function App() {
           onSelectTargetDate={handleSelectTargetDate}
           onSendToAllUnbooked={() => handleOpenBatchConfirm()}
           onOpenSchedulerTab={() => setActiveTab('scheduler')}
+          onOpenAnalyticsTab={() => setActiveTab('analytics')}
         />
 
         {/* Navigation Tabs Bar */}
@@ -580,6 +644,21 @@ export default function App() {
                 {unbookedEmployees.length}
               </span>
             )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
+              activeTab === 'analytics'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-indigo-400" />
+            <span>الإحصائيات والتحليلات الشاملة</span>
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold border border-emerald-500/30">
+              دوري حي
+            </span>
           </button>
 
           <button
@@ -651,6 +730,24 @@ export default function App() {
             onUpdateEmployee={handleUpdateEmployee}
             onAddEmployee={handleAddEmployee}
             sendingId={sendingId}
+          />
+        )}
+
+        {activeTab === 'analytics' && (
+          <AnalyticsTab
+            employees={employees}
+            availableDates={availableDates}
+            targetDate={targetDate}
+            logs={logs}
+            onRefreshData={() => loadSheet(true)}
+            isRefreshing={isRefreshing}
+            onSendSmsSingle={handleSendSmsSingle}
+            onSendToTargetList={handleOpenBatchConfirm}
+            onSelectTargetDate={handleSelectTargetDate}
+            autoSyncEnabled={schedulerConfig.autoSyncDataEnabled !== false}
+            periodicSyncMinutes={schedulerConfig.periodicSyncMinutes || 15}
+            nextSyncSeconds={nextSyncSeconds}
+            lastSyncedTime={lastSyncedTime}
           />
         )}
 

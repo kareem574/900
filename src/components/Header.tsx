@@ -30,6 +30,9 @@ interface HeaderProps {
   sheetSource: string;
   onOpenHelpModal?: () => void;
   lastSyncedTime?: string;
+  periodicSyncMinutes?: number;
+  nextSyncSeconds?: number;
+  autoSyncDataEnabled?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -47,6 +50,9 @@ export const Header: React.FC<HeaderProps> = ({
   sheetSource,
   onOpenHelpModal,
   lastSyncedTime,
+  periodicSyncMinutes = 15,
+  nextSyncSeconds,
+  autoSyncDataEnabled = true,
 }) => {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -172,6 +178,18 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </span>
             </div>
+
+            {/* Periodic Sheet Sync Badge */}
+            {autoSyncDataEnabled && nextSyncSeconds !== undefined && (
+              <div
+                title={`التحديث الدوري التلقائي للشيت مفعل كل ${periodicSyncMinutes} دقيقة`}
+                className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold"
+              >
+                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                <span>سحب دوري للشيت:</span>
+                <span className="font-mono text-white font-bold">{formatCountdown(nextSyncSeconds)}</span>
+              </div>
+            )}
 
             {/* Real Delivery Help Button */}
             {onOpenHelpModal && (

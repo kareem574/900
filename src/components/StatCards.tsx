@@ -12,6 +12,7 @@ interface StatCardsProps {
   onSelectTargetDate: (d: string) => void;
   onSendToAllUnbooked: () => void;
   onOpenSchedulerTab: () => void;
+  onOpenAnalyticsTab?: () => void;
 }
 
 export const StatCards: React.FC<StatCardsProps> = ({
@@ -24,6 +25,7 @@ export const StatCards: React.FC<StatCardsProps> = ({
   onSelectTargetDate,
   onSendToAllUnbooked,
   onOpenSchedulerTab,
+  onOpenAnalyticsTab,
 }) => {
   const total = employees.length;
   // Based on targetDate (first date by default)
@@ -50,7 +52,7 @@ export const StatCards: React.FC<StatCardsProps> = ({
               <h2 className="text-sm font-bold text-white">
                 تاريخ السحب والإرسال المعتمد:{' '}
                 <span className="text-blue-300 font-mono text-base underline decoration-blue-500 underline-offset-4">
-                  {targetDate || '2026/09/28'}
+                  {targetDate || '2026/09/30'}
                 </span>
               </h2>
               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30">
@@ -63,23 +65,36 @@ export const StatCards: React.FC<StatCardsProps> = ({
           </div>
         </div>
 
-        {/* Date Selector Dropdown if user wants to change target */}
-        {availableDates.length > 0 && (
-          <div className="flex items-center gap-2 self-start sm:self-auto bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5">
-            <span className="text-xs text-slate-400 whitespace-nowrap">تغيير تاريخ السحب:</span>
-            <select
-              value={targetDate}
-              onChange={(e) => onSelectTargetDate(e.target.value)}
-              className="bg-transparent text-xs font-bold text-blue-300 focus:outline-none cursor-pointer"
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* Analytics shortcut button */}
+          {onOpenAnalyticsTab && (
+            <button
+              onClick={onOpenAnalyticsTab}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 hover:text-white border border-indigo-500/40 text-xs font-bold transition-all cursor-pointer shadow-sm"
             >
-              {availableDates.map((d, idx) => (
-                <option key={d} value={d} className="bg-slate-900 text-white">
-                  {d} {idx === 0 ? '(أول تاريخ)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+              <span>التحليلات الشاملة</span>
+            </button>
+          )}
+
+          {/* Date Selector Dropdown if user wants to change target */}
+          {availableDates.length > 0 && (
+            <div className="flex items-center gap-2 bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5">
+              <span className="text-xs text-slate-400 whitespace-nowrap">تغيير التاريخ:</span>
+              <select
+                value={targetDate}
+                onChange={(e) => onSelectTargetDate(e.target.value)}
+                className="bg-transparent text-xs font-bold text-blue-300 focus:outline-none cursor-pointer"
+              >
+                {availableDates.map((d, idx) => (
+                  <option key={d} value={d} className="bg-slate-900 text-white">
+                    {d} {idx === 0 ? '(أول تاريخ)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Grid of 4 Cards */}

@@ -42,13 +42,21 @@ export const SchedulerTab: React.FC<SchedulerTabProps> = ({
   };
 
   const intervals = [
-    { label: 'كل 15 دقيقة (فوري)', value: 15 },
-    { label: 'كل 30 دقيقة (مستحسن)', value: 30 },
+    { label: 'كل 15 دقيقة (مستحسن - ربع ساعة)', value: 15 },
+    { label: 'كل 30 دقيقة', value: 30 },
     { label: 'كل 1 ساعة (دوري)', value: 60 },
     { label: 'كل 3 ساعات', value: 180 },
     { label: 'كل 6 ساعات', value: 360 },
     { label: 'كل 12 ساعة (صباحاً ومساءً)', value: 720 },
     { label: 'مرة واحدة يومياً (24 ساعة)', value: 1440 },
+  ];
+
+  const syncIntervals = [
+    { label: 'كل 5 دقائق (فائق السرعة)', value: 5 },
+    { label: 'كل 10 دقائق (سريع)', value: 10 },
+    { label: 'كل 15 دقيقة (الموصى به - ربع ساعة)', value: 15 },
+    { label: 'كل 30 دقيقة', value: 30 },
+    { label: 'كل 60 دقيقة (كل ساعة)', value: 60 },
   ];
 
   const cooldowns = [
@@ -234,9 +242,64 @@ export const SchedulerTab: React.FC<SchedulerTabProps> = ({
               </div>
             </label>
           </div>
-
         </div>
 
+      </div>
+
+      {/* Dedicated Periodic Data Sync Card */}
+      <div className="bg-slate-900/90 rounded-2xl border border-indigo-500/30 p-6 space-y-4 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <RotateCw className="w-5 h-5 animate-spin" style={{ animationDuration: '8s' }} />
+            </div>
+            <div>
+              <h4 className="text-base font-bold text-white flex items-center gap-2">
+                <span>التحديث الدوري التلقائي لبيانات الشيت (Periodic Live Sync)</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
+                  سحب دوري كل {config.periodicSyncMinutes || 15} دقيقة
+                </span>
+              </h4>
+              <p className="text-xs text-slate-400 mt-0.5">
+                يقوم النظام بإعادة جلب أحدث نسخة من شيت جوجل تلقائياً بالخلفية لضمان دقة الإحصائيات وعدم مراسلة أي موظف حجز حديثاً.
+              </p>
+            </div>
+          </div>
+
+          <label className="flex items-center gap-3 cursor-pointer bg-slate-950 px-4 py-2 rounded-xl border border-slate-800">
+            <input
+              type="checkbox"
+              checked={config.autoSyncDataEnabled !== false}
+              onChange={(e) => onUpdateConfig({ ...config, autoSyncDataEnabled: e.target.checked })}
+              className="w-5 h-5 rounded text-indigo-600 accent-indigo-600 cursor-pointer"
+            />
+            <span className="text-xs font-bold text-white">تفعيل التحديث الدوري</span>
+          </label>
+        </div>
+
+        {config.autoSyncDataEnabled !== false && (
+          <div className="pt-3 border-t border-slate-800 space-y-2">
+            <label className="text-xs font-semibold text-slate-300 block">
+              فترة التحديث الدوري لسحب البيانات من الشيت:
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              {syncIntervals.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  onClick={() => onUpdateConfig({ ...config, periodicSyncMinutes: s.value })}
+                  className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-center ${
+                    (config.periodicSyncMinutes || 15) === s.value
+                      ? 'bg-indigo-600 text-white border-indigo-400 shadow-md shadow-indigo-600/30'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:bg-slate-800/60 hover:text-white'
+                  }`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
     </div>

@@ -44,10 +44,13 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
   onAddEmployee,
   sendingId,
 }) => {
-  const [filter, setFilter] = useState<'all' | 'unbooked' | 'booked'>('unbooked');
+  const [filter, setFilter] = useState<'all' | 'unbooked' | 'booked' | 'zero_days' | 'has_any_booking'>('unbooked');
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
+
+  const zeroDaysCount = employees.filter((e) => (e.selectedDaysCount ?? 0) === 0).length;
+  const anyBookedCount = employees.filter((e) => (e.selectedDaysCount ?? 0) > 0).length;
 
   // Filter employees
   const filtered = employees.filter((emp) => {
@@ -62,10 +65,12 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
 
     if (!matchesSearch) return false;
 
-    // Filter by target date status
+    // Filter by target date status or zero-days / has_any_booking
     if (filter === 'all') return true;
     if (filter === 'unbooked') return emp.shiftStatus === 'unbooked';
     if (filter === 'booked') return emp.shiftStatus === 'booked';
+    if (filter === 'zero_days') return (emp.selectedDaysCount ?? 0) === 0;
+    if (filter === 'has_any_booking') return (emp.selectedDaysCount ?? 0) > 0;
 
     return true;
   });
@@ -145,6 +150,21 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
           </button>
 
           <button
+            onClick={() => setFilter('zero_days')}
+            className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              filter === 'zero_days'
+                ? 'bg-gradient-to-r from-red-600 to-rose-700 text-white shadow-md shadow-red-600/40 font-bold'
+                : 'text-rose-300 hover:bg-rose-900/30 border border-rose-500/30'
+            }`}
+          >
+            <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+            <span>معدومو الحجز (0 أيام)</span>
+            <span className="px-2 py-0.5 rounded-md bg-rose-950 text-rose-200 text-xs font-mono font-bold">
+              {zeroDaysCount}
+            </span>
+          </button>
+
+          <button
             onClick={() => setFilter('booked')}
             className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               filter === 'booked'
@@ -157,6 +177,18 @@ export const EmployeesList: React.FC<EmployeesListProps> = ({
             <span className="px-2 py-0.5 rounded-md bg-emerald-950 text-emerald-200 text-xs font-mono font-bold">
               {bookedCount} موظف
             </span>
+          </button>
+
+          <button
+            onClick={() => setFilter('has_any_booking')}
+            className={`px-4 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+              filter === 'has_any_booking'
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'text-indigo-300 hover:bg-indigo-900/20 border border-indigo-500/30'
+            }`}
+          >
+            <CheckCircle2 className="w-3.5 h-3.5 text-indigo-400" />
+            <span>حجزوا بالأسبوع ({anyBookedCount})</span>
           </button>
 
           <button

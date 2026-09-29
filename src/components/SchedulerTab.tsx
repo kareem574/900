@@ -52,7 +52,8 @@ export const SchedulerTab: React.FC<SchedulerTabProps> = ({
   ];
 
   const syncIntervals = [
-    { label: 'كل 5 دقائق (فائق السرعة)', value: 5 },
+    { label: 'كل دقيقة (أسرع تحديث)', value: 1 },
+    { label: 'كل 5 دقائق (موصى به)', value: 5 },
     { label: 'كل 10 دقائق (سريع)', value: 10 },
     { label: 'كل 15 دقيقة (الموصى به - ربع ساعة)', value: 15 },
     { label: 'كل 30 دقيقة', value: 30 },

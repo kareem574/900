@@ -137,7 +137,7 @@ export default function App() {
       cooldownHours: 12,
       autoSyncSheet: true,
       autoSyncDataEnabled: true, // Periodic sheet data sync
-      periodicSyncMinutes: 15, // Sync sheet every 15 minutes
+      periodicSyncMinutes: 5, // Sync sheet every 5 minutes
       notifyOnSend: true,
       soundEnabled: true,
     };
@@ -403,6 +403,22 @@ export default function App() {
     };
   }, [schedulerConfig.isEnabled, schedulerConfig.intervalMinutes, executeScheduledRun]);
 
+  // Refresh immediately when the user returns to the app or browser tab.
+  useEffect(() => {
+    const refreshWhenActive = () => {
+      if (document.visibilityState === 'visible' && !isRefreshing) {
+        loadSheet(false);
+      }
+    };
+
+    window.addEventListener('focus', refreshWhenActive);
+    document.addEventListener('visibilitychange', refreshWhenActive);
+    return () => {
+      window.removeEventListener('focus', refreshWhenActive);
+      document.removeEventListener('visibilitychange', refreshWhenActive);
+    };
+  }, [isRefreshing, loadSheet]);
+
   // Periodic Sheet Data Sync Loop (runs independently of auto SMS dispatch)
   useEffect(() => {
     if (schedulerConfig.autoSyncDataEnabled === false) {
@@ -420,7 +436,7 @@ export default function App() {
               minute: '2-digit',
               second: '2-digit',
             });
-            showToast(`🔄 تم التحديث الدوري للشيت تلقائياً (${timeStr})`, 'info');
+            showToast(`تم التحديث الدوري للشيت تلقائياً (${timeStr})`, 'info');
           });
           return intervalSecs;
         }

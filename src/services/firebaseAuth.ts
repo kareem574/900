@@ -14,8 +14,8 @@ const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0
 export const auth = getAuth(app);
 
 const provider = new GoogleAuthProvider();
-// Workspace scope for reading Google Sheets
-provider.addScope('https://www.googleapis.com/auth/spreadsheets.readonly');
+// Workspace scope for reading and updating Google Sheets
+provider.addScope('https://www.googleapis.com/auth/spreadsheets');
 
 let isSigningIn = false;
 let cachedAccessToken: string | null = null;
